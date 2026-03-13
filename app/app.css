@@ -5,5 +5,11 @@
   --color-background: #18191A;
   --color-text: #E4E6EB;
   --color-backgrounf-post: #2F3A4A;
-  
+  --color-border: #666666;
+  --color-background-site: #222;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
 }

@@ -1,0 +1,67 @@
+.postArea {
+    background-color: var(--color-background-site);
+    border: 3px solid;
+    border-radius: 35px;
+    border-color: var(--color-border);
+    flex: 1;
+}
+
+.pageWrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 90px;
+}
+
+.community {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 50px 0px 50px 0px;
+    
+}
+
+.community > div {
+    flex: 3;
+    display: flex;
+    align-items: center;
+}
+
+.community > div > .icons {
+    margin-left: 50px;
+}
+
+.text {
+    color: var(--color-text);
+}
+
+.button {
+    background-color: transparent;
+    border: 3px solid;
+    border-radius: 20px;
+    border-color: var(--color-border);
+    color: var(--color-text);
+    min-width: 150px;
+    min-height: 50px;
+    padding: 10px 20px;      
+    border-radius: 50px;   
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;     
+    justify-content: space-between;
+    gap: 10px;
+    text-align: center;
+    margin-right: 50px;
+}
+
+.communityLogo {
+    max-width: 80px;
+    max-height: 80px;
+    margin: 0px 30px 0px 50px;
+}
+
+.icons {
+    color: var(--color-text);
+}

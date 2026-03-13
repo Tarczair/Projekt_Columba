@@ -1,0 +1,73 @@
+.header {
+    width: auto;
+    height: 80px;
+    display: flex;
+    padding: 0px 100px 0px 100px;
+    background-color: var(--color-primary);
+    align-items: center;
+    justify-content: space-between;
+}
+
+.logo {
+    max-width: 80px;
+    max-height: 80px;
+    padding-right: 80px;
+    flex: 1;
+}
+
+.searchWrapper {
+    background-color: var(--color-secondary);
+    height: 35px;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 40px;
+    flex: 1;
+}
+
+.search {
+    background-color: var(--color-secondary);
+    width: max-content;
+    height: auto;
+    flex: 1;
+    color: var(--color-text);
+    border: none;
+}
+
+.search::placeholder {
+    color: var(--color-text);
+    text-align: center;
+    font-size: large;
+}
+
+.text {
+    color: var(--color-text);
+}
+
+.Columba {
+    display: flex;
+    color: var(--color-text);
+}
+
+
+.icons {
+    padding: 0px 20px 0px 20px;
+    color: var(--color-text);
+}
+
+.button {
+    width: 24px;
+    background: none;       /* Usuwa niebieskie/szare tło */
+    border: none;           /* Usuwa tę czarną ramkę 3D */
+    padding: 0;             /* Usuwa wewnętrzne odstępy */
+    cursor: pointer;        /* Zmienia kursor na "łapkę" po najechaniu */
+    display: flex;          /* Pomaga idealnie wycentrować ikonę */
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.button > .icons {
+    padding: 0;
+}

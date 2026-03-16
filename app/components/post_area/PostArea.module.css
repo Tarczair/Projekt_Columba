@@ -3,14 +3,15 @@
     border: 3px solid;
     border-radius: 35px;
     border-color: var(--color-border);
-    flex: 1;
+    flex: 4;
 }
 
 .pageWrapper {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     min-height: 100vh;
     margin: 90px;
+    gap: 50px;
 }
 
 .community {
@@ -56,6 +57,11 @@
     margin-right: 50px;
 }
 
+.button:hover, .button:hover > * {
+    color: var(--color-secondary);
+    border-color: var(--color-secondary);
+}
+
 .communityLogo {
     max-width: 80px;
     max-height: 80px;
@@ -64,4 +70,15 @@
 
 .icons {
     color: var(--color-text);
+}
+
+.settings {
+    margin-left: 20px;
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.settings:hover, .settings:hover > * {
+    color: var(--color-secondary);
 }

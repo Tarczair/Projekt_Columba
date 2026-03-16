@@ -1,6 +1,6 @@
 import SearchIcon from '@mui/icons-material/Search';
 import styles from "./Header.module.css";
-import logo from "../img/golab.png";
+import logo from "../../../public/img/golab.png";
 import ReorderIcon from '@mui/icons-material/Reorder';
 import LoginIcon from '@mui/icons-material/Login';
 import LogoutIcon from '@mui/icons-material/Logout';

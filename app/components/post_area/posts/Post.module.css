@@ -51,6 +51,11 @@
     flex: 1;
 }
 
+.textPost {
+    color: var(--color-text);
+    font-size: larger;
+}
+
 .header > div {
     flex: 3;
     display: flex;
@@ -73,6 +78,10 @@
     align-items: center;
     justify-content: center;
     color: white;
+}
+
+.postOptions:hover, .postOptions:hover > * {
+    color: var(--color-secondary);
 }
 
 .postContent > p {
@@ -105,9 +114,13 @@
     display: flex;
     align-items: center;
     justify-content: center; 
-    gap: 12px;
-    padding: 0 15px;
-    margin-right: 50px;
+    gap: 5px;
+    padding: 0 5px;
+    margin-right: 20px;
+}
+
+.votes > * {
+    flex:1;
 }
 
 
@@ -132,16 +145,16 @@
     display: flex;
     align-items: center;  
     justify-content: center;
+    justify-items: center;
     gap: 8px; 
-    padding: 0 20px;
+    padding: 0 5px;
     height: 60px;
     min-width: 100px;
     margin-right: 20px;
 }
 
 .button > * {
-    flex: none;
-    align-self: auto;
+    padding: 0;
 }
 
 .button:hover {
@@ -152,5 +165,18 @@
 .icons {
     min-height: 24px;
     min-width: 24px;
-    padding-right: 10px;
+}
+
+.tytul {
+    text-align: left;
+    color: var(--color-text);
+    width: calc(100% - 60px);
+    margin-left: 60px;
+    font-size: xx-large;
+    margin-bottom: 0;
+}
+
+.tags {
+    color: var(--color-secondary);
+    width: calc(100% - 90px);
 }

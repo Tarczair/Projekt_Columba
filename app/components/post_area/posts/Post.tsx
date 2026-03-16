@@ -1,17 +1,24 @@
 import styles from "./Post.module.css"
-import avatarPath from "../../img/pepe_placeholder.png"
-import image from "../../img/golab.png"
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import CommentIcon from '@mui/icons-material/Comment';
 import OutlinedFlagIcon from '@mui/icons-material/OutlinedFlag';
 
-export function Post({ /*avatarPath, userName, title, image, text, tags, upvotes, isRemoved, createdAt, comments*/ }) {
-    const userName = "Przykładowy użytkownik";
-    const createdAt = "4 godz. temu";
-    const upvotes = 46;
-    const comments = 46;
+interface PostProps {
+  avatarPath: string
+  userName: string
+  title: string
+  image: string
+  text: string
+  tags: string[]
+  upvotes: number
+  isRemoved: boolean
+  createdAt: string
+  comments: number
+}
+
+export function Post({ avatarPath, userName, title, image, text, tags, upvotes, isRemoved, createdAt, comments } : PostProps) {
 
     return(
         <div className={styles.post}>
@@ -23,13 +30,21 @@ export function Post({ /*avatarPath, userName, title, image, text, tags, upvotes
                 </div>
                 <button className={styles.postOptions}><MoreHorizIcon/></button>
             </div>
-            <div className={styles.postContent}>
-                <p className={styles.text}>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Officiis quaerat officia quia debitis modi, ratione, 
-                    rem asperiores mollitia ab nostrum beatae. Iste sint, ab, vero, soluta a rem assumenda quam architecto provident possimus earum est 
-                    temporibus quod voluptatum quibusdam dolorem.
+            {!isRemoved ? <div className={styles.postContent}>
+                <h2 className={styles.tytul}>
+                    {title}
+                </h2>
+                <p className={styles.textPost}>{text}
                 </p>
-                <img className={styles.postImage} src={image} alt="image" />
-            </div>
+                {image.length == 0 ? <div></div> : <img className={styles.postImage} src={image} alt="image" />}
+                <p className={styles.tags}>{tags.map((tag, i) => (
+                    <span key={tag}>
+                    #{tag}{i !== tags.length - 1 && " | "}
+                    </span>
+                ))}
+                </p>
+            </div> : <div className={styles.text}>Post został usunięty</div>}
+            
             <div className={styles.reactions}>
                 <div className={styles.votes}>
                     <button className={styles.vote}><ArrowUpwardIcon className={styles.icons}/></button>

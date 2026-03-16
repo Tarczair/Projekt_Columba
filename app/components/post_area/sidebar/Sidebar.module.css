@@ -1,0 +1,64 @@
+.sidebar {
+    flex: 1;
+    background-color: var(--color-background-site);
+    border: 3px solid;
+    border-radius: 35px;
+    border-color: var(--color-border);
+    padding: 20px;
+}
+
+.text {
+    color: var(--color-text);
+}
+
+.button {
+    background-color: transparent;
+    border: none;
+    color: var(--color-text);
+    cursor: pointer;
+    display: flex;
+    align-items: center;  
+    justify-content: space-between;
+    padding: 0 5px;
+    height: 60px;
+    flex: 1;
+    font-size: large;
+    width: 100%;
+}
+
+
+
+.button:hover, .button:hover > * {
+    color: var(--color-secondary);
+    cursor: pointer;
+}
+
+
+
+.list {
+    list-style-type: none;
+    color: var(--color-text);
+    padding: 0;
+}
+
+.list > * {
+    display: flex;
+    align-items: center;
+    margin: 10px;
+    font-size: larger;
+}
+
+.avatar {
+    max-width: 50px;
+    max-height: 50px;
+    padding-right: 20px;
+}
+
+.newSection {
+    border-bottom: 1px solid;
+    border-color: var(--color-border);
+}
+
+.icon {
+    color: var(--color-text);
+}

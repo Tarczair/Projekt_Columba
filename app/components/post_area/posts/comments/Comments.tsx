@@ -47,7 +47,7 @@ export default function Comments() {
                         author="Michał Wilk"
                         time="2024-03-18 10:30"
                         content="Nie no bratku totalnie -1 i nie rel."
-                        upvotes={3}
+                        upvotes={-8}
                         repliesCount={0}
                         avatarPath="/img/pepe_placeholder.png"
                     />

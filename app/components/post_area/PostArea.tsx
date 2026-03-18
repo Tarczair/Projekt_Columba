@@ -5,9 +5,15 @@ import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import { Post } from "./posts/Post";
 import { Sidebar } from "./sidebar/Sidebar";
+import { useState } from "react";
+import CreatePost from "./CreatePost/CreatePost";
 
 export function PostArea() {
 
+    const [isCreatingPost, setIsCreatingPost] = useState(false); 
+    const toggleCreatePost = () => {
+        setIsCreatingPost(!isCreatingPost); 
+    }
 
     const posts = [
         {
@@ -62,9 +68,18 @@ export function PostArea() {
                         <h1 className={styles.text}>{communityName}</h1>
                         <button className={styles.settings}><SettingsIcon className={styles.icons}/></button>
                     </div>
-                    <button className={styles.button}>Dodaj post <AddCircleOutlineIcon className={styles.icons}/></button>
+                    
+                    <button className={styles.button} onClick={toggleCreatePost}>
+                        Dodaj post <AddCircleOutlineIcon className={styles.icons}/>
+                    </button>
+                    
+
                     <button className={styles.button}>Dołącz <PersonAddIcon className={styles.icons}/></button>
                 </div>
+
+                {isCreatingPost && <div className={styles.createPostForm}>
+                    <CreatePost />
+                </div>}
                 {posts.map(post => (
                     <Post
                         key={post.id}

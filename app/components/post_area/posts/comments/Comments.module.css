@@ -9,7 +9,7 @@
 
 .addComment {
     display: flex;
-    align-items: flex-start; /* Zmienione z 'center', żeby przycisk nie rósł w pionie, gdy ktoś pisze długi komentarz */
+    align-items: flex-start; 
     gap: 10px;
     margin-bottom: 20px;
 }
@@ -23,10 +23,10 @@
     color: var(--color-text);
     resize: vertical;
     min-height: 40px;
-    font-family: inherit; /* Wymusza czcionkę taką samą jak w reszcie aplikacji */
+    font-family: inherit; 
 }
 
-/* Dodatkowy efekt: jak klikniesz w pole, ramka podświetli się na Wasz główny kolor */
+
 .commentInput:focus {
     outline: none;
     border-color: var(--color-secondary);
@@ -42,10 +42,10 @@
     align-items: center;  
     justify-content: center;
     gap: 8px; 
-    padding: 0 15px; /* Minimalnie szerszy padding, żeby tekst ładnie siedział */
-    height: 44px; /* Sztywna wysokość dopasowana pod inputa */
+    padding: 0 15px; 
+    height: 44px; 
     transition: 0.2s;
-    font-weight: bold; /* Pogrubiony tekst na przycisku */
+    font-weight: bold; 
 }
 
 .submitButton:hover {
@@ -62,7 +62,7 @@
     padding-right: 10px;
 }
 
-/* Własny styl dla paska przewijania (scrolla) z boku komentarzy */
+
 .commentsList::-webkit-scrollbar {
     width: 6px;
 }
@@ -73,7 +73,7 @@
 
 .comment {
     background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--color-border); /* Subtelna obwódka dla każdego dymka z komentarzem */
+    border: 1px solid var(--color-border); 
     border-radius: 10px;
     padding: 15px;
 }
@@ -89,12 +89,8 @@
     margin: 0;
     color: var(--color-text);
     line-height: 1.4;
-    opacity: 0.85; /* Minimalnie wygaszony tekst, żeby nick u góry bardziej zwracał uwagę */
+    opacity: 0.85; 
 }
-
-/* =========================================
-   STYLE DLA POJEDYNCZEGO KOMENTARZA I DRZEWA
-   ========================================= */
 
 .commentWrapper {
     display: flex;
@@ -119,7 +115,7 @@
 .commentAvatar {
     width: 35px;
     height: 35px;
-    border-radius: 5px; /* Kwadratowe z lekkim zaokrągleniem, jak Pepe */
+    border-radius: 5px; 
     object-fit: cover;
 }
 
@@ -166,7 +162,7 @@
     gap: 15px;
 }
 
-/* Kopiujemy style przycisków, żeby działały w komentarzach */
+
 .votes {
     display: flex;
     align-items: center;
@@ -213,10 +209,10 @@
     font-size: 1.2rem;
 }
 
-/* --- MAGIA DRZEWA KOMENTARZY --- */
+
 .nestedReplies {
-    margin-left: 35px; /* Odsuwamy odpowiedzi w prawo */
-    border-left: 2px solid var(--color-border); /* Rysujemy lewą linię */
+    margin-left: 35px; 
+    border-left: 2px solid var(--color-border); 
     padding-left: 20px;
     margin-top: 10px;
 }

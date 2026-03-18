@@ -1,0 +1,215 @@
+.createPostContainer {
+    width: 100%;
+    max-width: 900px;
+    margin: 20px auto;
+    color: #fff;
+    font-family: Arial, sans-serif;
+}
+
+.mainTitle {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 10px;
+}
+
+.formWrapper {
+    background-color: #1a1d21; 
+    padding: 20px;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.communitySelect {
+    background-color: #2d333b;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 8px 12px;
+    border-radius: 5px;
+    width: fit-content;
+    cursor: pointer;
+}
+
+.inputWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.topicInput {
+    width: 100%;
+    background-color: #2d333b;
+    border: 1px solid #444;
+    padding: 12px;
+    border-radius: 5px;
+    color: #fff;
+}
+
+.charCounter {
+    position: absolute;
+    right: 10px;
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.contentRow {
+    display: flex;
+    gap: 15px;
+    min-height: 250px;
+}
+
+.textContent {
+    flex: 2;
+    background-color: #2d333b;
+    border: 2px solid #444;
+    border-radius: 10px;
+    padding: 15px;
+    color: #fff;
+    resize: none;
+}
+
+.uploadBox {
+    flex: 1;
+    border: 2px dashed #444;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: 0.3s;
+    text-align: center;
+    padding: 10px;
+}
+
+.uploadBox:hover {
+    border-color: #007bff;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.uploadIcon {
+    font-size: 3rem !important;
+    margin-bottom: 10px;
+    color: #ccc;
+}
+
+.actionButtons {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 10px;
+}
+
+.blueBtn, .sendBtn {
+    background-color: #1a73e8;
+    color: white;
+    border: none;
+    padding: 8px 25px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.blueBtn:hover, .sendBtn:hover {
+    background-color: #1557b0;
+}
+
+.btnIcon {
+    font-size: 1.1rem !important;
+}
+
+.sendBtn {
+    margin-left: auto;
+}
+
+.spoilerLabel {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.hiddenCheckbox {
+    display: none;
+}
+
+
+.spoilerButton {
+    background-color: transparent;
+    border: 2px solid var(--color-border);
+    color: var(--color-text);
+    padding: 6px 15px 6px 25px;
+    border-radius: 50px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-weight: bold;
+    transition: 0.2s;
+    font-size: 16px;
+}
+
+
+.checkCircle {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--color-border);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: transparent;
+    transition: 0.2s;
+}
+
+
+.checkCircle.active {
+    border-color: var(--color-secondary);
+    color: var(--color-secondary);
+}
+
+
+.spoilerLabel:hover .spoilerButton {
+    border-color: var(--color-secondary);
+}
+
+.checkIcon { 
+    font-size: 1rem !important; 
+}
+
+.selectedTagsContainer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 5px;
+    padding: 0 5px;
+}
+
+.tagChip {
+    background-color: rgba(var(--color-secondary-rgb), 0.1);
+    border: 1px solid var(--color-secondary);
+    color: var(--color-secondary);
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.removeTag {
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    color: var(--color-text);
+    opacity: 0.6;
+    transition: 0.2s;
+}
+
+.removeTag:hover {
+    opacity: 1;
+    color: #ff4444;
+}

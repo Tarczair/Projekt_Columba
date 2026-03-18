@@ -5,6 +5,10 @@ import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import CommentIcon from '@mui/icons-material/Comment';
 import OutlinedFlagIcon from '@mui/icons-material/OutlinedFlag';
 
+import Comments from "./comments/Comments"; //Pobieram funkcję z komentarzy
+import { useState } from "react"; // Żeby określać stan czy komentarze rozwinięte czy nie
+
+
 interface PostProps {
   avatarPath: string
   userName: string
@@ -20,6 +24,12 @@ interface PostProps {
 
 export function Post({ avatarPath, userName, title, image, text, tags, upvotes, isRemoved, createdAt, comments } : PostProps) {
 
+    const [showComments, setShowComments] = useState(false); // Stan do pokazywania komentarzy
+
+    const toggleComments = () => {
+        setShowComments(!showComments); // Funkcja do przełączania stanu komentarzy
+    }
+    
     return(
         <div className={styles.post}>
             <div className={styles.header}>
@@ -51,9 +61,13 @@ export function Post({ avatarPath, userName, title, image, text, tags, upvotes, 
                     <p className={styles.text}>{upvotes}</p>
                     <button className={styles.vote}><ArrowDownwardIcon className={styles.icons}/></button>
                 </div>
-                <button className={styles.button}>{comments}<CommentIcon className={styles.icons}/></button>
+                <button className={styles.button} onClick={toggleComments}>
+                    {comments}<CommentIcon className={styles.icons}/>
+                </button>
                 <button className={styles.button}><OutlinedFlagIcon className={styles.icons}/>Zgłoś</button>
             </div>
+
+            {showComments && <Comments />} {/* Jeśli show comments = true czyli użytkownik kliknie to nam to pokaże */}
         </div>
     );
 }

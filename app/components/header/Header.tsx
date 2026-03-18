@@ -35,7 +35,7 @@ export function Header() {
         <header className={styles.header}>
             <div className={styles.Columba}>
                 <img src={logo} className={styles.logo} alt="logo" />
-                <h1>Columbo</h1>
+                <h1>Columba</h1>
             </div>
             <div className={styles.searchWrapper}>
                 <input type="text" className={styles.search} placeholder='Wyszukaj...' />

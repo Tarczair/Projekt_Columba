@@ -1,0 +1,103 @@
+.overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal {
+    background-color: var(--color-background-site);
+    border: 2px solid var(--color-border);
+    border-radius: 10px;
+    width: 350px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.title {
+    padding: 15px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--color-text);
+}
+
+.searchBar {
+    background-color: var(--color-secondary);
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.searchBar input {
+    background: transparent;
+    border: none;
+    color: white;
+    outline: none;
+    width: 100%;
+}
+
+.searchIcon { color: white; font-size: 1.2rem !important; }
+
+.tagList {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.tagItem {
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    color: var(--color-text);
+}
+
+.checkCircle {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--color-border);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: transparent;
+}
+
+.checkCircle.active {
+    border-color: var(--color-secondary);
+    color: var(--color-secondary);
+}
+
+.checkIcon { font-size: 1rem !important; }
+
+.footer {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    background-color: #111;
+}
+
+.backBtn {
+    background: #ccc;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 25px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.confirmBtn {
+    background: var(--color-secondary);
+    border: none;
+    color: white;
+    border-radius: 20px;
+    padding: 8px 25px;
+    cursor: pointer;
+    font-weight: bold;
+}

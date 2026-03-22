@@ -2,6 +2,7 @@ import { useState } from 'react';
 import styles from './Tag.module.css';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckIcon from '@mui/icons-material/Check';
+import Search from '~/components/search/search';
 
 interface TagProps {
     onClose: () => void;
@@ -30,14 +31,7 @@ export default function Tag({ onClose, onConfirm, currentTags }: TagProps) {
             <div className={styles.modal}>
                 <h3 className={styles.title}>WYBIERZ TAGI DLA POSTA</h3>
                 
-                <div className={styles.searchBar}>
-                    <input 
-                        placeholder="Wyszukaj..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <SearchIcon className={styles.searchIcon} />
-                </div>
+                <Search/>
 
                 <div className={styles.tagList}>
                     {filteredTags.map(tag => (

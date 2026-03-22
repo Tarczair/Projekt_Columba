@@ -23,6 +23,9 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
+import { Header } from "./components/header/Header";
+import { Footer } from "./components/footer/Footer";
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
@@ -33,9 +36,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
+        <Header />
         {children}
         <ScrollRestoration />
         <Scripts />
+        <Footer />
       </body>
     </html>
   );

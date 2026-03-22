@@ -1,6 +1,11 @@
 import styles from "./Profile.module.css"
-import Search from "../search/search";
+import Search from "../search/Search";
 import { useState } from "react";
+import SettingsIcon from '@mui/icons-material/Settings';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import CommentIcon from '@mui/icons-material/Comment';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+
 
     const USER_DATA = {
         id: 3,
@@ -30,7 +35,39 @@ import { useState } from "react";
         id: 4,
         name: "Społeczność 4",
         avatar: "/img/pepe_placeholder.png",
-    }]
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+    ,{
+        id: 4,
+        name: "Społeczność 4",
+        avatar: "/img/pepe_placeholder.png",
+    }
+
+    ]
 
     const CREATED_COMMUNITIES = [ {
         id: 5,
@@ -46,61 +83,115 @@ import { useState } from "react";
     const POSTS = [         
         {
             id: 2,
-            avatarPath: "/img/pepe_placeholder.png",
-            userName: "Użytkownik 2",
             title: "Drugi post",
             upvotes: 45,
             isRemoved: false,
             createdAt: "5h temu",
             comments: 4,
             communityName: "Społeczność 1",
+            communityAvatar: "/img/pepe_placeholder.png",
+        },
+        {
+            id: 3,
+            title: "Drugi post",
+            upvotes: 45,
+            isRemoved: false,
+            createdAt: "5h temu",
+            comments: 4,
+            communityName: "Społeczność 1",
+            communityAvatar: "/img/pepe_placeholder.png",
         },
     ]
 
-    const [showCommunities, setShowCommunities] = useState(true); 
-    const [showCreatedCommunities, setShowCreatedCommunities] = useState(false); 
-    const [showPosts, setShowPosts] = useState(false); 
-
-    const toggleCommunities = () => {
-        setShowCommunities(!showCommunities); 
-    }
-
-    const toggleCreatedCommunities = () => {
-        setShowCreatedCommunities(!showCreatedCommunities); 
-    }
-
-    const togglePosts = () => {
-        setShowPosts(!showPosts); 
-    }
-
     export default function Profile() {
+        
+        const [showCommunities, setShowCommunities] = useState(true); 
+        const [showCreatedCommunities, setShowCreatedCommunities] = useState(false); 
+        const [showPosts, setShowPosts] = useState(false); 
+
+        const toggleCommunities = () => {
+            setShowCommunities(true); 
+            setShowCreatedCommunities(false);
+            setShowPosts(false);
+        }
+
+        const toggleCreatedCommunities = () => {
+            setShowCreatedCommunities(true); 
+            setShowCommunities(false); 
+            setShowPosts(false);
+        }
+
+        const togglePosts = () => {
+            setShowPosts(true); 
+            setShowCommunities(false); 
+            setShowCreatedCommunities(false);
+        }
+
+
         return(
-            <div>
-                <form>
-                    <div>
-                        <img src={USER_DATA.avatar} alt="" />
-                        <input type="text" value={USER_DATA.username}/>
-                        <div>
-                            <p>{USER_DATA.username.length}/300</p>
-                            <p>Dołączono: {USER_DATA.joinedDate}</p>
+            <div className={styles.site}>
+                <form className={styles.userinfo}>
+                    <div className={styles.firstSection}>
+                        <img className={styles.avatar} src={USER_DATA.avatar} alt="" />
+                        <input className={styles.input} type="text" value={USER_DATA.username}/>
+                        <div className={styles.name}>
+                            <p className={styles.text}>{USER_DATA.username.length}/300</p>
+                            <p className={styles.date}>Dołączono: {USER_DATA.joinedDate}</p>
                         </div>
                     </div>
-                    <div>
-                        <input type="text" value={USER_DATA.bio} />
-                        <input type="text" value={USER_DATA.email} />
-                        <input type="submit" value="Zatwierdź zmiany" />
+                    <div className={styles.secondSection}>
+                        <textarea className={styles.inputDesc} value={USER_DATA.bio} />
+                        <input className={styles.input} type="text" value={USER_DATA.email} />
+                        <input className={styles.submit} type="submit" value="Zatwierdź zmiany" />
                     </div>
                 </form>
-                <div>
-                    <Search/>
-                    <div>
-                        <button onClick={toggleCommunities}>TWOJE SPOŁECZNOŚCI</button>
-                        <button onClick={togglePosts}>TWOJE POSTY</button>
-                        <button onClick={toggleCreatedCommunities}>ZAŁOŻONE SPOŁECZNOŚCI</button>
+                <div className={styles.listComm}>
+                    <div className={styles.header}>
+                        <Search/>
+                        <div className={styles.options}>
+                            <button onClick={toggleCommunities}>TWOJE SPOŁECZNOŚCI</button>
+                            <button onClick={togglePosts}>TWOJE POSTY</button>
+                            <button onClick={toggleCreatedCommunities}>ZAŁOŻONE SPOŁECZNOŚCI</button>
+                        </div>
                     </div>
                     {showCommunities &&                      
-                        <ul>
-                            <li></li>
+                        <ul className={styles.list}>
+                            {COMMUNITIES.map((comm, index) => (
+                                <li className={styles.listElement} key={index}>
+                                    <img className={styles.smallAvatar} src={comm.avatar} alt="" />
+                                    <span className={styles.text}>
+                                        {comm.name}
+                                    </span>
+                                    <button className={styles.button}>Opuść społeczność <ArrowBackIcon className={styles.icon}/></button>
+                                </li>
+                            ))}
+                        </ul>
+                    }
+                    {showCreatedCommunities &&                      
+                        <ul className={styles.list}>
+                            {CREATED_COMMUNITIES.map((comm, index) => (
+                                <li className={styles.listElement} key={index}>
+                                    <img className={styles.smallAvatar} src={comm.avatar} alt="" />
+                                    <span className={styles.text}>
+                                        {comm.name}
+                                    </span>
+                                    <SettingsIcon className={styles.settings}/>
+                                </li>
+                            ))}
+                        </ul>
+                    }
+                    {showPosts &&                      
+                        <ul className={styles.list}>
+                            {POSTS.map((post, index) => (
+                                <li className={styles.listElement} key={index}>
+                                    <img className={styles.smallAvatar} src={post.communityAvatar} alt="" />
+                                    <span className={styles.text}>{post.communityName}</span>
+                                    <span className={styles.text}>{post.title}</span>
+                                    <span className={styles.text}>{post.createdAt}</span>
+                                    <div className={styles.reactions}> <span className={styles.iconText}>{post.comments}</span> <ArrowUpwardIcon className={styles.icon}/></div>
+                                    <div className={styles.reactions}> <span className={styles.iconText}>{post.upvotes}</span> <CommentIcon className={styles.icon}/></div>
+                                </li>
+                            ))}
                         </ul>
                     }
 

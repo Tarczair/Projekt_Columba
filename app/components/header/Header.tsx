@@ -9,7 +9,7 @@ import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import ChatIcon from '@mui/icons-material/Chat';
 import { useState, useEffect, useRef } from 'react';
 import { Link } from "react-router";
-import Search from '../search/search';
+import Search from '../search/Search';
 
 export function Header() {
     const [isMenuOpen, setMenuOpen] = useState(false);
@@ -48,7 +48,7 @@ export function Header() {
                 {isMenuOpen && (
                     <div className={styles.menu}>
                         <Link to="/login" className={styles.menuOption}>REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons}/></Link>
-                        <button className={styles.menuOption}>PROFIL <PersonIcon className={styles.menuIcons}/></button>
+                        <Link to="/profile" className={styles.menuOption}>PROFIL <PersonIcon className={styles.menuIcons}/></Link>
                         <button className={styles.menuOption}>WYLOGUJ <LogoutIcon className={styles.menuIcons}/></button>
                         <button className={styles.menuOption}>ZAŁÓŻ SPOŁECZNOŚĆ <GroupAddIcon className={styles.menuIcons}/></button>
                         <button className={styles.menuOption}>TWOJE POSTY <ChatIcon className={styles.menuIcons}/></button>

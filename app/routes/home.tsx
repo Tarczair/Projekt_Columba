@@ -1,5 +1,5 @@
 import type { Route } from "./+types/home";
-import { MainView } from "../MainView";
+  import { PostArea } from "../components/post_area/PostArea"
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,5 +9,9 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function Home() {
-  return <MainView />;
+      return(
+          <main>
+              <PostArea/>
+          </main>
+      );
 }

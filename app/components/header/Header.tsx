@@ -8,6 +8,8 @@ import PersonIcon from '@mui/icons-material/Person';
 import GroupAddIcon from '@mui/icons-material/GroupAdd';
 import ChatIcon from '@mui/icons-material/Chat';
 import { useState, useEffect, useRef } from 'react';
+import { Link } from "react-router";
+import Search from '../search/search';
 
 export function Header() {
     const [isMenuOpen, setMenuOpen] = useState(false);
@@ -33,20 +35,19 @@ export function Header() {
 
     return(
         <header className={styles.header}>
-            <div className={styles.Columba}>
+            <Link to="/" className={styles.Columba}>
                 <img src={logo} className={styles.logo} alt="logo" />
                 <h1>Columba</h1>
-            </div>
-            <div className={styles.searchWrapper}>
-                <input type="text" className={styles.search} placeholder='Wyszukaj...' />
-                <SearchIcon className={styles.icons} />
-            </div>
+            </Link>
+
+            <Search/>
+
             <div ref={menuRef}>
                 <button className={styles.button} onClick={toogleMenu}><ReorderIcon className={styles.icons}/></button>
 
                 {isMenuOpen && (
                     <div className={styles.menu}>
-                        <button className={styles.menuOption}>REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons}/></button>
+                        <Link to="/login" className={styles.menuOption}>REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons}/></Link>
                         <button className={styles.menuOption}>PROFIL <PersonIcon className={styles.menuIcons}/></button>
                         <button className={styles.menuOption}>WYLOGUJ <LogoutIcon className={styles.menuIcons}/></button>
                         <button className={styles.menuOption}>ZAŁÓŻ SPOŁECZNOŚĆ <GroupAddIcon className={styles.menuIcons}/></button>

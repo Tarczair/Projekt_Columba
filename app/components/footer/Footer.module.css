@@ -1,19 +1,19 @@
 .footer {
-    width: auto;
-    height: 80px;
-    display: flex;
-    padding: 0px 100px 0px 100px;
-    background-color: var(--color-primary);
-    align-items: center;
-    justify-content: space-between;
+  width: auto;
+  height: 80px;
+  display: flex;
+  padding: 0px 100px 0px 100px;
+  background-color: var(--color-primary);
+  align-items: center;
+  justify-content: space-between;
 }
 
 .footerButton {
-    color: var(--color-text);
-    flex: 1;
+  color: var(--color-text);
+  flex: 1;
 }
 
 .tradeMark {
-    color: var(--color-text);
-    flex: 3;
+  color: var(--color-text);
+  flex: 3;
 }

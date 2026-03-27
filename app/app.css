@@ -1,10 +1,10 @@
 :root {
   /* Definicja palety kolorów */
-  --color-primary: #0D47A1;
-  --color-secondary: #1976D2;
-  --color-background: #18191A;
-  --color-text: #E4E6EB;
-  --color-backgrounf-post: #2F3A4A;
+  --color-primary: #0d47a1;
+  --color-secondary: #1976d2;
+  --color-background: #18191a;
+  --color-text: #e4e6eb;
+  --color-backgrounf-post: #2f3a4a;
   --color-border: #666666;
   --color-background-site: #222;
 }
@@ -16,6 +16,6 @@ body {
 
 a {
   text-decoration: none;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-weight: 250;
 }

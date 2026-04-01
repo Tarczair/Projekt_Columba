@@ -1,114 +1,58 @@
 import styles from "./Profile.module.css";
 import Search from "../search/Search";
-import { useState } from "react";
+import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CommentIcon from "@mui/icons-material/Comment";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 
-const USER_DATA = {
-  id: 3,
-  username: "Użytkownik 2",
-  email: "user@columba.pl",
-  avatar: "/img/pepe_placeholder.png",
-  bio: "soluta a rem assumenda quam architecto provident possimus earum est temporibus quod voluptatum quibusdam dolorem.",
-  joinedDate: "21 Marca 2024",
-};
-
-const COMMUNITIES = [
-  {
-    id: 1,
-    name: "Społeczność 1",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 2,
-    name: "Społeczność 2",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 3,
-    name: "Społeczność 3",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 4,
-    name: "Społeczność 4",
-    avatar: "/img/pepe_placeholder.png",
-  },
-];
-
-const CREATED_COMMUNITIES = [
-  {
-    id: 5,
-    name: "Społeczność 5",
-    avatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 6,
-    name: "Społeczność 6",
-    avatar: "/img/pepe_placeholder.png",
-  },
-];
-
-const POSTS = [
-  {
-    id: 2,
-    title: "Drugi post",
-    upvotes: 45,
-    isRemoved: false,
-    createdAt: "5h temu",
-    comments: 4,
-    communityName: "Społeczność 1",
-    communityAvatar: "/img/pepe_placeholder.png",
-  },
-  {
-    id: 3,
-    title: "Drugi post",
-    upvotes: 45,
-    isRemoved: false,
-    createdAt: "5h temu",
-    comments: 4,
-    communityName: "Społeczność 1",
-    communityAvatar: "/img/pepe_placeholder.png",
-  },
-];
+interface UserProfile {
+  id: string;
+  username: string;
+  email: string;
+  avatar: string;
+  bio: string;
+  created_at: string;
+  communities: any[];
+  posts: any[];
+  createdCommunities: any[];
+}
 
 export default function Profile() {
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
   const [showCommunities, setShowCommunities] = useState(true);
   const [showCreatedCommunities, setShowCreatedCommunities] = useState(false);
   const [showPosts, setShowPosts] = useState(false);
 
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:5000/api/me", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (response.ok) {
+          setUser(data);
+        }
+      } catch (err) {
+        console.error("Błąd pobierania profilu:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Funkcje przełączające zakładki
   const toggleCommunities = () => {
     setShowCommunities(true);
     setShowCreatedCommunities(false);
@@ -127,24 +71,58 @@ export default function Profile() {
     setShowCreatedCommunities(false);
   };
 
+  const handleInputChange = (
+    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    if (!user) return;
+    setUser({ ...user, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    alert("Zapisano");
+  };
+
+  if (loading) return <div className={styles.site}>Ładowanie profilu...</div>;
+  if (!user)
+    return (
+      <div className={styles.site}>
+        Musisz się zalogować, aby zobaczyć profil.
+      </div>
+    );
+
   return (
     <div className={styles.site}>
-      <form className={styles.userinfo}>
+      <form className={styles.userinfo} onSubmit={handleSubmit}>
         <div className={styles.firstSection}>
-          <img className={styles.avatar} src={USER_DATA.avatar} alt="" />
+          <img
+            className={styles.avatar}
+            src={user.avatar || "/img/pepe_placeholder.png"}
+            alt="Avatar"
+          />
           <input
             className={styles.input}
             type="text"
-            value={USER_DATA.username}
+            name="username"
+            value={user.username}
+            onChange={handleInputChange}
           />
           <div className={styles.name}>
-            <p className={styles.text}>{USER_DATA.username.length}/300</p>
-            <p className={styles.date}>Dołączono: {USER_DATA.joinedDate}</p>
+            <p className={styles.text}>{user.username?.length || 0}/300</p>
+            <p className={styles.date}>
+              Dołączono: {new Date(user.created_at).toLocaleDateString()}
+            </p>
           </div>
         </div>
         <div className={styles.secondSection}>
-          <textarea className={styles.inputDesc} value={USER_DATA.bio} />
-          <p className={styles.text}>{USER_DATA.email}</p>
+          <textarea
+            className={styles.inputDesc}
+            name="bio"
+            value={user.bio || ""}
+            placeholder="Opowiedz coś o sobie..."
+            onChange={handleInputChange}
+          />
+          <p className={styles.text}>{user.email}</p>
           <input
             className={styles.submit}
             type="submit"
@@ -152,22 +130,41 @@ export default function Profile() {
           />
         </div>
       </form>
+
       <div className={styles.listComm}>
         <div className={styles.header}>
           <Search />
           <div className={styles.options}>
-            <button onClick={toggleCommunities}>TWOJE SPOŁECZNOŚCI</button>
-            <button onClick={togglePosts}>TWOJE POSTY</button>
-            <button onClick={toggleCreatedCommunities}>
+            <button
+              onClick={toggleCommunities}
+              className={showCommunities ? styles.active : ""}
+            >
+              TWOJE SPOŁECZNOŚCI
+            </button>
+            <button
+              onClick={togglePosts}
+              className={showPosts ? styles.active : ""}
+            >
+              TWOJE POSTY
+            </button>
+            <button
+              onClick={toggleCreatedCommunities}
+              className={showCreatedCommunities ? styles.active : ""}
+            >
               ZAŁOŻONE SPOŁECZNOŚCI
             </button>
           </div>
         </div>
+
         {showCommunities && (
           <ul className={styles.list}>
-            {COMMUNITIES.map((comm, index) => (
-              <li className={styles.listElement} key={index}>
-                <img className={styles.smallAvatar} src={comm.avatar} alt="" />
+            {user.communities?.map((comm, index) => (
+              <li className={styles.listElement} key={comm.id || index}>
+                <img
+                  className={styles.smallAvatar}
+                  src={comm.avatar || "/img/pepe_placeholder.png"}
+                  alt=""
+                />
                 <span className={styles.text}>{comm.name}</span>
                 <button className={styles.button}>
                   Opuść społeczność <ArrowBackIcon className={styles.icon} />
@@ -176,38 +173,42 @@ export default function Profile() {
             ))}
           </ul>
         )}
+
         {showCreatedCommunities && (
           <ul className={styles.list}>
-            {CREATED_COMMUNITIES.map((comm, index) => (
-              <li className={styles.listElement} key={index}>
-                <img className={styles.smallAvatar} src={comm.avatar} alt="" />
+            {user.createdCommunities?.map((comm, index) => (
+              <li className={styles.listElement} key={comm.id || index}>
+                <img
+                  className={styles.smallAvatar}
+                  src={comm.avatar || "/img/pepe_placeholder.png"}
+                  alt=""
+                />
                 <span className={styles.text}>{comm.name}</span>
                 <SettingsIcon className={styles.settings} />
               </li>
             ))}
           </ul>
         )}
+
         {showPosts && (
           <ul className={styles.list}>
-            {POSTS.map((post, index) => (
-              <li className={styles.listElement} key={index}>
+            {user.posts?.map((post, index) => (
+              <li className={styles.listElement} key={post.id || index}>
                 <img
                   className={styles.smallAvatar}
-                  src={post.communityAvatar}
+                  src={post.communityAvatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
                 <span className={styles.text}>{post.communityName}</span>
                 <span className={styles.text}>{post.title}</span>
                 <span className={styles.text}>{post.createdAt}</span>
                 <div className={styles.reactions}>
-                  {" "}
-                  <span className={styles.iconText}>{post.comments}</span>{" "}
-                  <ArrowUpwardIcon className={styles.icon} />
+                  <span className={styles.iconText}>{post.comments}</span>
+                  <CommentIcon className={styles.icon} />
                 </div>
                 <div className={styles.reactions}>
-                  {" "}
-                  <span className={styles.iconText}>{post.upvotes}</span>{" "}
-                  <CommentIcon className={styles.icon} />
+                  <span className={styles.iconText}>{post.upvotes}</span>
+                  <ArrowUpwardIcon className={styles.icon} />
                 </div>
               </li>
             ))}

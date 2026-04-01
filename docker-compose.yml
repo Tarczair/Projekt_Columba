@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # Baza danych PostgreSQL
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: projekt_columba
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  # Backend (Node.js)
+  backend:
+    build: ./server
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgres://user:password@db:5432/projekt_columba
+      - JWT_SECRET=twoj_sekret_na_pozniej
+    depends_on:
+      - db
+
+  # Frontend (Vite / React)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev # Używamy wersji .dev do programowania
+    ports:
+      - "5173:5173"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

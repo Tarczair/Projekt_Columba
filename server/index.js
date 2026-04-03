@@ -41,7 +41,6 @@ app.post("/api/register", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   const { identity, password } = req.body;
   try {
-    // 1. Szukamy użytkownika po mailu lub loginie
     const userResult = await pool.query(
       "SELECT * FROM users WHERE email = $1 OR username = $1",
       [identity],
@@ -53,13 +52,11 @@ app.post("/api/login", async (req, res) => {
 
     const user = userResult.rows[0];
 
-    // 2. Sprawdzamy hasło
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ error: "Nieprawidłowe dane logowania" });
     }
 
-    // 3. Generujemy token JWT
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       JWT_SECRET,
@@ -83,7 +80,6 @@ app.listen(5000, "0.0.0.0", () => {
   console.log("Serwer Node śmiga na porcie 5000");
 });
 
-// 1. Middleware do weryfikacji tokena
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1]; // Wyciąga "TOKEN" z "Bearer TOKEN"
@@ -92,15 +88,13 @@ const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ error: "Token nieważny" });
-    req.user = user; // Tu mamy userId zdekodowany z tokena
+    req.user = user;
     next();
   });
 };
 
-// 2. Endpoint profilu
 app.get("/api/me", authenticateToken, async (req, res) => {
   try {
-    // Pobieramy dane użytkownika
     const userQuery = await pool.query(
       "SELECT id, username, email, bio, avatar_url as avatar, created_at FROM users WHERE id = $1",
       [req.user.userId],
@@ -111,7 +105,7 @@ app.get("/api/me", authenticateToken, async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Pobieramy społeczności, do których należy (uproszczony przykład)
+    //Pobieramy społeczności, do których należy (uproszczony przykład)
     const commsQuery = await pool.query(
       "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1",
       [req.user.userId],
@@ -120,10 +114,73 @@ app.get("/api/me", authenticateToken, async (req, res) => {
     res.json({
       ...userData,
       communities: commsQuery.rows,
-      posts: [], // Tu możesz dopisać query do postów analogicznie
-      createdCommunities: [], // Tu query do owned_id
+      posts: [],
+      createdCommunities: [],
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
+
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+const uploadDir = "uploads";
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({ storage: storage });
+
+app.use("/uploads", express.static("uploads"));
+
+app.post(
+  "/api/update_profile",
+  authenticateToken,
+  upload.single("avatar"),
+  async (req, res) => {
+    try {
+      const { username, bio } = req.body;
+      const userId = req.user.userId;
+
+      let avatarUrl = req.body.avatar_url;
+      if (req.file) {
+        avatarUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      }
+
+      const nameCheck = await pool.query(
+        "SELECT id FROM users WHERE username = $1 AND id != $2",
+        [username, userId],
+      );
+
+      if (nameCheck.rows.length > 0) {
+        return res
+          .status(400)
+          .json({ error: "Ta nazwa użytkownika jest już zajęta" });
+      }
+
+      const userQuery = await pool.query(
+        `UPDATE users 
+       SET username = $1, bio = $2, avatar_url = $3 
+       WHERE id = $4 
+       RETURNING id, username, email, bio, avatar_url AS avatar, created_at`,
+        [username, bio, avatarUrl, userId],
+      );
+
+      res.json({ message: "Profil zaktualizowany", user: userQuery.rows[0] });
+    } catch (err) {
+      console.error("Błąd bazy:", err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);

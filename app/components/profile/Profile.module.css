@@ -11,6 +11,27 @@
   align-items: flex-start;
 }
 
+.inputs {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.uploadBox {
+  width: 30%;
+  border: 2px dashed var(--color-border);
+  background-color: var(--color-backgrounf-post);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  text-align: center;
+  padding: 10px;
+  color: var(--color-border);
+}
+
 .userinfo {
   display: flex;
   flex-direction: column;
@@ -76,8 +97,8 @@
   border-radius: 8px;
   padding: 15px;
   color: var(--color-text);
-  min-height: 300px;
-  width: 100%;
+  min-height: 200px;
+  width: 60%;
   text-align: start;
 }
 

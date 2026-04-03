@@ -1,10 +1,17 @@
 import styles from "./Profile.module.css";
 import Search from "../search/Search";
-import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import SettingsIcon from "@mui/icons-material/Settings";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CommentIcon from "@mui/icons-material/Comment";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 
 interface UserProfile {
   id: string;
@@ -25,6 +32,7 @@ export default function Profile() {
   const [showCommunities, setShowCommunities] = useState(true);
   const [showCreatedCommunities, setShowCreatedCommunities] = useState(false);
   const [showPosts, setShowPosts] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -52,7 +60,6 @@ export default function Profile() {
     fetchProfile();
   }, []);
 
-  // Funkcje przełączające zakładki
   const toggleCommunities = () => {
     setShowCommunities(true);
     setShowCreatedCommunities(false);
@@ -78,9 +85,52 @@ export default function Profile() {
     setUser({ ...user, [e.target.name]: e.target.value });
   };
 
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    alert("Zapisano");
+    const token = localStorage.getItem("token");
+
+    if (!token) return;
+
+    const formData = new FormData();
+    formData.append("username", user?.username || "");
+    formData.append("bio", user?.bio || "");
+
+    if (fileInputRef.current?.files?.[0]) {
+      formData.append("avatar", fileInputRef.current.files[0]);
+    } else {
+      formData.append("avatar_url", user?.avatar || "");
+    }
+
+    try {
+      const response = await fetch("http://localhost:5000/api/update_profile", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        alert("Profil został zaktualizowany!");
+        setUser((prevUser) => ({
+          ...prevUser,
+          ...data.user,
+          created_at: prevUser?.created_at,
+        }));
+        localStorage.setItem("user", JSON.stringify(data.user));
+      } else {
+        alert(data.error || "Wystąpił błąd");
+      }
+    } catch (err) {
+      console.error("Błąd sieci:", err);
+      alert("Błąd połączenia z serwerem");
+    }
   };
 
   if (loading) return <div className={styles.site}>Ładowanie profilu...</div>;
@@ -114,14 +164,32 @@ export default function Profile() {
             </p>
           </div>
         </div>
+
         <div className={styles.secondSection}>
-          <textarea
-            className={styles.inputDesc}
-            name="bio"
-            value={user.bio || ""}
-            placeholder="Opowiedz coś o sobie..."
-            onChange={handleInputChange}
-          />
+          <div className={styles.inputs}>
+            <textarea
+              className={styles.inputDesc}
+              name="bio"
+              value={user.bio || ""}
+              placeholder="Opowiedz coś o sobie..."
+              onChange={handleInputChange}
+            />
+
+            <div className={styles.uploadBox} onClick={handleUploadClick}>
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                accept="image/*"
+              />
+              <ArrowForwardIcon
+                className={styles.uploadIcon}
+                style={{ transform: "rotate(-45deg) scale(2)" }}
+              />
+              <p>Prześlij zdjęcie/film</p>
+            </div>
+          </div>
+
           <p className={styles.text}>{user.email}</p>
           <input
             className={styles.submit}

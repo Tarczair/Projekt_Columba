@@ -8,8 +8,11 @@ import { Sidebar } from "./sidebar/Sidebar";
 import { useState } from "react";
 import CreatePost from "./CreatePost/CreatePost";
 import { Link } from "react-router";
+import useAuth from "~/hooks/useAuth";
 
 export function PostArea() {
+  const { isLoggedIn } = useAuth();
+
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const toggleCreatePost = () => {
     setIsCreatingPost(!isCreatingPost);
@@ -76,7 +79,8 @@ export function PostArea() {
               </button>
             </Link>
           </div>
-
+          {isLoggedIn && (
+          <>
           <button className={styles.button} onClick={toggleCreatePost}>
             Dodaj post <AddCircleOutlineIcon className={styles.icons} />
           </button>
@@ -84,6 +88,8 @@ export function PostArea() {
           <button className={styles.button}>
             Dołącz <PersonAddIcon className={styles.icons} />
           </button>
+          </>
+          )}
         </div>
 
         {isCreatingPost && (

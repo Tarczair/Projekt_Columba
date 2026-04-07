@@ -3,12 +3,14 @@ import { useState } from "react";
 import avatarPath from "../../../../public/img/pepe_placeholder.png";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import useAuth from "~/hooks/useAuth";
 
 export function Sidebar(
   {
     /*communityName, description, rules, tags, isRemoved, createdAt*/
   },
 ) {
+  const { isLoggedIn } = useAuth();
   const userName = "Przykładowy społeczność";
   const createdAt = "12.01.2025";
   const comments = 46;
@@ -88,6 +90,9 @@ export function Sidebar(
           </ul>
         )}
       </div>
+
+      {isLoggedIn && (
+      <>
       <div className={styles.newSection}>
         <h3 className={styles.text}>TWOJE SPOŁECZNOŚCI</h3>
         <ul className={styles.list}>
@@ -109,6 +114,7 @@ export function Sidebar(
           )}
         </button>
       </div>
+
       <div className={styles.newSection}>
         <h3 className={styles.text}>TWOJE KONTAKY</h3>
         <ul className={styles.list}>
@@ -130,6 +136,7 @@ export function Sidebar(
           )}
         </button>
       </div>
+      </>)}
     </div>
   );
 }

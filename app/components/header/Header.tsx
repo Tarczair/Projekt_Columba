@@ -9,9 +9,13 @@ import ChatIcon from "@mui/icons-material/Chat";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
 import Search from "../search/Search";
+import useAuth from "../../hooks/useAuth";
 
 export function Header() {
   const [isMenuOpen, setMenuOpen] = useState(false);
+
+  const { isLoggedIn, handleLogout } = useAuth();
+
 
   const toogleMenu = () => setMenuOpen(!isMenuOpen);
 
@@ -47,21 +51,32 @@ export function Header() {
 
         {isMenuOpen && (
           <div className={styles.menu}>
+            {/* Dla Gości */}
+            {!isLoggedIn&& (
             <Link to="/login" className={styles.menuOption}>
               REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons} />
             </Link>
+            )}
+
+            {/* Dla Zalogowanych */}
+            {isLoggedIn && (
+            <button className={styles.menuOption} onClick={handleLogout}>
+              WYLOGUJ <LogoutIcon className={styles.menuIcons} />
+            </button>)}
+            {isLoggedIn && (
             <Link to="/profile" className={styles.menuOption}>
               PROFIL <PersonIcon className={styles.menuIcons} />
-            </Link>
-            <button className={styles.menuOption}>
-              WYLOGUJ <LogoutIcon className={styles.menuIcons} />
-            </button>
+            </Link>)}
+            {isLoggedIn && (
             <button className={styles.menuOption}>
               ZAŁÓŻ SPOŁECZNOŚĆ <GroupAddIcon className={styles.menuIcons} />
-            </button>
+            </button>)}
+            {isLoggedIn && (
             <button className={styles.menuOption}>
               TWOJE POSTY <ChatIcon className={styles.menuIcons} />
-            </button>
+            </button>)}
+            {/*Teraz się spostrzegłem że można było użyć <> i </> żeby nie pisać 4 różnych elementów ale trudno xD*/}
+
           </div>
         )}
       </div>

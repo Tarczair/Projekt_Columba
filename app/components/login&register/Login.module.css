@@ -36,6 +36,7 @@
   border-color: var(--color-border);
   font-size: larger;
   width: 300px;
+  color: white;
 }
 
 .textInput::placeholder {

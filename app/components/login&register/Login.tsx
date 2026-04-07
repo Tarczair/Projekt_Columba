@@ -1,10 +1,15 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import styles from "./Login.module.css";
+import { useNavigate } from "react-router";
+import useAuth from "~/hooks/useAuth";
+  
 
 export default function Login() {
   const [identity, setIdentity] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -22,7 +27,10 @@ export default function Login() {
         // Zapisujemy token JWT w przeglądarce
         localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/profile";
+
+
+        navigate("/profile"); // Przekierowanie do profilu po zalogowaniu
+        //window.location.href = "/profile"; //to nam generuje błąd "Cannot read properties of null (reading 'useContext')" 
       } else {
         alert(data.error || "Błąd logowania");
       }

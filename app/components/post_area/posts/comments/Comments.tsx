@@ -1,9 +1,17 @@
 import styles from "./Comments.module.css";
 import Comment from "./Comment";
+import useAuth from "~/hooks/useAuth";
 
 export default function Comments() {
+  const { isLoggedIn } = useAuth();
+
+
   return (
+    <>
+    
     <div className={styles.commentContainer}>
+      {isLoggedIn && (
+    <>
       <div className={styles.addComment}>
         <textarea
           className={styles.commentInput}
@@ -12,6 +20,7 @@ export default function Comments() {
         />
         <button className={styles.submitButton}>Dodaj komentarz</button>
       </div>
+      </> )}
 
       {/* Przykładowe pokazowe dane przed załączneiem bazy danych*/}
       <div className={styles.commentsList}>
@@ -52,5 +61,6 @@ export default function Comments() {
         </Comment>
       </div>
     </div>
+    </>
   );
 }

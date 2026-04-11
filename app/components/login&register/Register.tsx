@@ -47,7 +47,7 @@ export default function Register() {
     <form className={styles.formRegister} onSubmit={handleSubmit}>
       <input
         className={styles.textInput}
-        type="text"
+        type="email"
         name="email"
         placeholder="E-mail"
         onChange={handleChange}

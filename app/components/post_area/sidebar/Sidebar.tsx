@@ -4,15 +4,26 @@ import avatarPath from "../../../../public/img/pepe_placeholder.png";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 
-export function Sidebar(
-  {
-    /*communityName, description, rules, tags, isRemoved, createdAt*/
-  },
-) {
-  const userName = "Przykładowy społeczność";
-  const createdAt = "12.01.2025";
-  const comments = 46;
+interface Rule {
+  rule_title: string;
+  description: string;
+}
 
+interface SidebarProps {
+  name?: string;
+  description?: string;
+  createdAt?: string;
+  rules?: Rule[];
+  tags?: string[];
+}
+
+export function Sidebar({
+  name = "Nazwa społeczności",
+  description = "Brak opisu.",
+  createdAt,
+  rules = [],
+  tags = [],
+}: SidebarProps) {
   const [isRules, setIsRules] = useState(false);
   const toogleRules = () => setIsRules(!isRules);
 
@@ -22,13 +33,10 @@ export function Sidebar(
   const [isContact, setIsContact] = useState(false);
   const toogleContact = () => setIsContact(!isContact);
 
-  const tags = ["Tag_1", "Tag_2", "Tag_3"];
-  const rules = [
-    "nie wiem idk",
-    "nie wiem idk tylko dłuższe",
-    "nie wiem idk tylko dłuższe",
-    "dobra moze starczy dla testow",
-  ];
+  const dateDisplay = createdAt
+    ? new Date(createdAt).toLocaleDateString("pl-PL")
+    : "Nieznana";
+
   const communities = [
     "Społeczność 1",
     "Społeczność 2",
@@ -37,6 +45,7 @@ export function Sidebar(
     "Społeczność 5",
     "Społeczność 6",
   ];
+
   const contacts = [
     "Użytkownik 1",
     "Użytkownik 2",
@@ -49,26 +58,26 @@ export function Sidebar(
   return (
     <div className={styles.sidebar}>
       <div className={styles.newSection}>
-        <h2 className={styles.text}>{userName}</h2>
-        <p className={styles.text}>Utworzona: {createdAt}</p>
+        <h2 className={styles.text}>{name}</h2>
+        <p className={styles.text}>Utworzona: {dateDisplay}</p>
       </div>
+
       <div className={styles.newSection}>
         <h3 className={styles.text}>Opis społeczności</h3>
-        <p className={styles.text}>
-          Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptates
-          amet corrupti optio sint tempora reprehenderit labore sit doloremque,
-          ipsam, minus eveniet quod debitis dolores illum ipsum omnis unde
-          aspernatur dolorem!
-        </p>
+        <p className={styles.text}>{description}</p>
       </div>
-      <div className={styles.newSection}>
-        <p className={styles.text}>TAGI:</p>
-        <ul className={styles.list}>
-          {tags.map((tag, index) => (
-            <li key={index}>#{tag}</li>
-          ))}
-        </ul>
-      </div>
+
+      {tags.length > 0 && (
+        <div className={styles.newSection}>
+          <p className={styles.text}>TAGI:</p>
+          <ul className={styles.list}>
+            {tags.map((tag, index) => (
+              <li key={index}>#{tag}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className={styles.newSection}>
         <button className={styles.button} onClick={toogleRules}>
           REGULAMIN{" "}
@@ -80,14 +89,19 @@ export function Sidebar(
         </button>
         {isRules && (
           <ul className={styles.list}>
-            {rules.map((rule, index) => (
-              <li key={index}>
-                Zasada nr {index + 1}: {rule}
-              </li>
-            ))}
+            {rules.length > 0 ? (
+              rules.map((rule, index) => (
+                <li key={index} className={styles.ruleItem}>
+                  <strong>{rule.rule_title}</strong>: {rule.description}
+                </li>
+              ))
+            ) : (
+              <li className={styles.text}>Brak zdefiniowanych zasad.</li>
+            )}
           </ul>
         )}
       </div>
+
       <div className={styles.newSection}>
         <h3 className={styles.text}>TWOJE SPOŁECZNOŚCI</h3>
         <ul className={styles.list}>
@@ -101,7 +115,7 @@ export function Sidebar(
             ))}
         </ul>
         <button className={styles.button} onClick={toogleCommunities}>
-          Wiecej społeczności{" "}
+          {isCommunities ? "Mniej" : "Więcej"} społeczności{" "}
           {isCommunities ? (
             <ExpandLessIcon className={styles.icon} />
           ) : (
@@ -109,8 +123,9 @@ export function Sidebar(
           )}
         </button>
       </div>
+
       <div className={styles.newSection}>
-        <h3 className={styles.text}>TWOJE KONTAKY</h3>
+        <h3 className={styles.text}>TWOJE KONTAKTY</h3>
         <ul className={styles.list}>
           {contacts
             .slice(0, isContact ? contacts.length : 3)
@@ -122,7 +137,7 @@ export function Sidebar(
             ))}
         </ul>
         <button className={styles.button} onClick={toogleContact}>
-          Wiecej kontaktów{" "}
+          {isContact ? "Mniej" : "Więcej"} kontaktów{" "}
           {isContact ? (
             <ExpandLessIcon className={styles.icon} />
           ) : (

@@ -136,9 +136,13 @@ export default function Profile() {
   if (loading) return <div className={styles.site}>Ładowanie profilu...</div>;
   if (!user)
     return (
-      <div className={styles.site}>
-        Musisz się zalogować, aby zobaczyć profil.
-      </div>
+      <main className={styles.addCommunity}>
+        <div className={styles.centeredMessage}>
+          <h1 className={styles.errorTitle}>
+            MUSISZ SIĘ ZALOGOWAĆ ABY SPRAWDZIĆ PROFIL
+          </h1>
+        </div>
+      </main>
     );
 
   return (

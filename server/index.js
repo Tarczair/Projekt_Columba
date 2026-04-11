@@ -184,3 +184,119 @@ app.post(
     }
   },
 );
+
+app.get("/api/communities/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+
+    const community = await pool.query(
+      "SELECT * FROM communities WHERE name ILIKE $1",
+      [name],
+    );
+
+    if (community.rows.length === 0)
+      return res.status(404).json({ error: "Brak" });
+
+    const communityId = community.rows[0].id;
+
+    const rules = await pool.query(
+      "SELECT rule_title, description FROM rules WHERE community_id = $1",
+      [communityId],
+    );
+
+    const tags = await pool.query(
+      "SELECT name FROM tags WHERE community_id = $1",
+      [communityId],
+    );
+
+    res.json({
+      ...community.rows[0],
+      rules: rules.rows,
+      tags: tags.rows.map((t) => t.name),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(
+  "/api/communities",
+  authenticateToken,
+  upload.single("avatar"),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { name, description, rules: rulesJson } = req.body;
+      const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
+      const userId = req.user.userId;
+
+      const rules = rulesJson ? JSON.parse(rulesJson) : [];
+
+      let avatarUrl = null;
+      if (req.file) {
+        avatarUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      }
+
+      await client.query("BEGIN");
+
+      const communityResult = await client.query(
+        `INSERT INTO communities (name, description, avatar_url, owner_id) 
+         VALUES ($1, $2, $3, $4) 
+         RETURNING id`,
+        [name, description, avatarUrl, userId],
+      );
+
+      const communityId = communityResult.rows[0].id;
+
+      await client.query(
+        `INSERT INTO community_members (community_id, user_id, role) 
+         VALUES ($1, $2, 'owner')`,
+        [communityId, userId],
+      );
+
+      if (rules && rules.length > 0) {
+        for (const rule of rules) {
+          await client.query(
+            `INSERT INTO rules (community_id, rule_title, description) 
+             VALUES ($1, $2, $3)`,
+            [communityId, rule.rule_title, rule.description],
+          );
+        }
+      }
+
+      if (tags.length > 0) {
+        for (const tag of tags) {
+          const tagName = typeof tag === "string" ? tag : tag.name;
+
+          await client.query(
+            `INSERT INTO tags (community_id, name) 
+             VALUES ($1, $2)`,
+            [communityId, tagName],
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message: "Stworzono społeczność!",
+        communityId: communityId,
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Błąd tworzenia społeczności:", err);
+
+      if (err.code === "23505") {
+        return res.status(400).json({
+          error: "Społeczność o tej nazwie już istnieje",
+        });
+      }
+
+      res.status(500).json({
+        error: err.message,
+      });
+    }
+  },
+);

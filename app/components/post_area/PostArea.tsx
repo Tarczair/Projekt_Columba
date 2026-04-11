@@ -1,19 +1,67 @@
 import styles from "./PostArea.module.css";
-import pepe from "../../../public/img/pepe_placeholder.png";
+import pepe from "../../../public/img/pepe_placeholder.png"; // Użyjemy tego jako fallbacku!
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { Post } from "./posts/Post";
 import { Sidebar } from "./sidebar/Sidebar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CreatePost from "./CreatePost/CreatePost";
-import { Link } from "react-router";
+import { Link, useParams } from "react-router";
+
+interface Rule {
+  rule_title: string;
+  description: string;
+}
+
+interface CommunityData {
+  id: string;
+  name: string;
+  description: string;
+  avatar_url: string | null;
+  created_at: string;
+  rules: Rule[];
+  tags: string[];
+}
 
 export function PostArea() {
+  const { communityName } = useParams();
+
   const [isCreatingPost, setIsCreatingPost] = useState(false);
+  const [communityData, setCommunityData] = useState<CommunityData | null>(
+    null,
+  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
   const toggleCreatePost = () => {
     setIsCreatingPost(!isCreatingPost);
   };
+
+  useEffect(() => {
+    const fetchCommunity = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/communities/${communityName}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Nie znaleziono społeczności (404)");
+        }
+
+        const data = await response.json();
+        setCommunityData(data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (communityName) {
+      fetchCommunity();
+    }
+  }, [communityName]);
 
   const posts = [
     {
@@ -21,7 +69,7 @@ export function PostArea() {
       avatarPath: "/img/pepe_placeholder.png",
       userName: "Użytkownik 1",
       title: "Przykładowy pierwszy post",
-      text: "Lorem ipsum dolor sit amet, consectetur adipisicing elit. Officiis quaerat officia quia debitis modi, ratione, rem asperiores mollitia ab nostrum beatae. Iste sint, ab, vero, soluta a rem assumenda quam architecto provident possimus earum est temporibus quod voluptatum quibusdam dolorem.",
+      text: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
       tags: ["tag_1", "Tag_2"],
       image: "/img/golab.png",
       upvotes: 120,
@@ -29,35 +77,20 @@ export function PostArea() {
       createdAt: "2h temu",
       comments: 4,
     },
-    {
-      id: 2,
-      avatarPath: "/img/pepe_placeholder.png",
-      userName: "Użytkownik 2",
-      title: "Drugi post",
-      text: "soluta a rem assumenda quam architecto provident possimus earum est temporibus quod voluptatum quibusdam dolorem.",
-      tags: ["tag_1", "Tag_2"],
-      image: "",
-      upvotes: 45,
-      isRemoved: false,
-      createdAt: "5h temu",
-      comments: 4,
-    },
-    {
-      id: 3,
-      avatarPath: "/img/pepe_placeholder.png",
-      userName: "Użytkownik 2",
-      title: "Drugi post",
-      text: "soluta a rem assumenda quam architecto provident possimus earum est temporibus quod voluptatum quibusdam dolorem.",
-      tags: ["tag_1", "Tag_2"],
-      image: "",
-      upvotes: 45,
-      isRemoved: true,
-      createdAt: "5h temu",
-      comments: 4,
-    },
   ];
 
-  const communityName = "Przykładowa społeczność";
+  if (isLoading) {
+    return <div className={styles.pageWrapper}>Ładowanie społeczności...</div>;
+  }
+
+  if (error || !communityData) {
+    return (
+      <div className={styles.pageWrapper}>
+        <h1>{error || "Społeczność nie istnieje"}</h1>
+        <Link to="/">Wróć na stronę główną</Link>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.pageWrapper}>
@@ -65,11 +98,12 @@ export function PostArea() {
         <div className={styles.community}>
           <div>
             <img
-              src={pepe}
+              src={communityData.avatar_url || pepe}
               className={styles.communityLogo}
-              alt="community logo"
+              alt={`${communityData.name} logo`}
             />
-            <h1 className={styles.text}>{communityName}</h1>
+            <h1 className={styles.text}>{communityData.name}</h1>
+
             <Link to="/communities_settings">
               <button className={styles.settings}>
                 <SettingsIcon className={styles.icons} />
@@ -91,6 +125,7 @@ export function PostArea() {
             <CreatePost />
           </div>
         )}
+
         {posts.map((post) => (
           <Post
             key={post.id}
@@ -107,7 +142,13 @@ export function PostArea() {
           />
         ))}
       </div>
-      <Sidebar></Sidebar>
+      <Sidebar
+        name={communityData.name}
+        description={communityData.description}
+        createdAt={communityData.created_at}
+        rules={communityData.rules}
+        tags={communityData.tags}
+      />
     </div>
   );
 }

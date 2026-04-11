@@ -56,9 +56,9 @@ export function Header() {
             <button className={styles.menuOption}>
               WYLOGUJ <LogoutIcon className={styles.menuIcons} />
             </button>
-            <button className={styles.menuOption}>
+            <Link to="/add_community" className={styles.menuOption}>
               ZAŁÓŻ SPOŁECZNOŚĆ <GroupAddIcon className={styles.menuIcons} />
-            </button>
+            </Link>
             <button className={styles.menuOption}>
               TWOJE POSTY <ChatIcon className={styles.menuIcons} />
             </button>

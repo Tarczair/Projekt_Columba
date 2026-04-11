@@ -1,5 +1,5 @@
 import type { Route } from "./+types/home";
-import { PostArea } from "../components/post_area/PostArea";
+import HomeFeed from "../components/home_feed/HomeFeed";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -11,7 +11,7 @@ export function meta({}: Route.MetaArgs) {
 export default function Home() {
   return (
     <main>
-      <PostArea />
+      <HomeFeed />
     </main>
   );
 }

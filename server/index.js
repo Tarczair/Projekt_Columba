@@ -10,6 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "twoj_bardzo_tajny_klucz_123";
 
 app.use(cors());
 app.use(express.json());
+app.use(express.text());
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -293,6 +294,52 @@ app.post(
           error: "Społeczność o tej nazwie już istnieje",
         });
       }
+
+      res.status(500).json({
+        error: err.message,
+      });
+    }
+  },
+);
+
+app.post(
+  "/api/joincommunity",
+  authenticateToken,
+  express.text(),
+  async (req, res) => {
+    const client = await pool.connect();
+    try {
+      const name = req.body;
+      const userId = req.user.userId;
+
+      await client.query("BEGIN");
+
+      const result = await client.query(
+        `SELECT id FROM communities WHERE name = $1`,
+        [name],
+      );
+
+      const communityId = result.rows[0].id;
+
+      if (result.rows.length === 0) {
+        throw new Error("Społeczność o tej nazwie nie istnieje.");
+      }
+
+      await client.query(
+        `INSERT INTO community_members (community_id, user_id) 
+         VALUES ($1, $2)`,
+        [communityId, userId],
+      );
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message: "Dołączono do społeczności!",
+        communityId: communityId,
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Błąd dołączenia do społeczności:", err);
 
       res.status(500).json({
         error: err.message,

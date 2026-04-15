@@ -63,6 +63,52 @@ export function PostArea() {
     }
   }, [communityName]);
 
+  const handleJoinCommunity = async () => {
+    if (!communityName) return;
+
+    const fetchJoinCommunity = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/joincommunity",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain",
+              Authorization: `Bearer ${token}`,
+            },
+            body: communityName,
+          },
+        );
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(errorData.error);
+          } else {
+            throw new Error(`Błąd serwera (status ${response.status})`);
+          }
+        }
+
+        const data = await response.json();
+        console.log("Sukces:", data);
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    await fetchJoinCommunity();
+  };
+
   const posts = [
     {
       id: 1,
@@ -115,7 +161,7 @@ export function PostArea() {
             Dodaj post <AddCircleOutlineIcon className={styles.icons} />
           </button>
 
-          <button className={styles.button}>
+          <button className={styles.button} onClick={handleJoinCommunity}>
             Dołącz <PersonAddIcon className={styles.icons} />
           </button>
         </div>

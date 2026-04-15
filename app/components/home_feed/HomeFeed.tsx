@@ -5,8 +5,25 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { Post } from "../post_area/posts/Post";
 import { Link } from "react-router";
+import { useState, useEffect } from "react";
+import { authEmitter } from "../services/authEmitter"; // IMPORT: do sprawdzania czy użytkownik jest zalogowany
 
 export default function HomeFeed() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const updateAuth = () => {
+      setIsLoggedIn(authEmitter.isAuthenticated());
+    };
+
+    updateAuth();
+    authEmitter.subscribe("authChange", updateAuth);
+
+    return () => {
+      authEmitter.unsubscribe("authChange", updateAuth);
+    };
+  }, []);
+
   const feedData = [
     {
       communityName: "Programowanie",
@@ -75,11 +92,17 @@ export default function HomeFeed() {
                     Odwiedź <VisibilityIcon className={styles.buttonIcon} />
                   </button>
                 </Link>
-                <button
-                  className={`${styles.actionButton} ${styles.joinButton}`}
-                >
-                  Dołącz <PersonAddIcon className={styles.buttonIcon} />
-                </button>
+                {/* ===== ZABEZPIECZENIE: Przycisk "Dołącz" tylko dla zalogowanych =====
+                    Używamy authEmitter.isAuthenticated() żeby sprawdzić czy użytkownik ma token
+                    Jeśli nie jest zalogowany - przycisk się nie wyświetla
+                */}
+                {isLoggedIn && (
+                  <button
+                    className={`${styles.actionButton} ${styles.joinButton}`}
+                  >
+                    Dołącz <PersonAddIcon className={styles.buttonIcon} />
+                  </button>
+                )}
               </div>
             </div>
 

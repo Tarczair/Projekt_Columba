@@ -8,6 +8,7 @@ import { Sidebar } from "./sidebar/Sidebar";
 import { useState, useEffect } from "react";
 import CreatePost from "./CreatePost/CreatePost";
 import { Link, useParams } from "react-router";
+import { authEmitter } from "../services/authEmitter"; // IMPORT: do sprawdzania czy użytkownik jest zalogowany
 
 interface Rule {
   rule_title: string;
@@ -33,10 +34,24 @@ export function PostArea() {
   );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const toggleCreatePost = () => {
     setIsCreatingPost(!isCreatingPost);
   };
+
+  useEffect(() => {
+    const updateAuth = () => {
+      setIsLoggedIn(authEmitter.isAuthenticated());
+    };
+
+    updateAuth();
+    authEmitter.subscribe("authChange", updateAuth);
+
+    return () => {
+      authEmitter.unsubscribe("authChange", updateAuth);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchCommunity = async () => {
@@ -161,9 +176,17 @@ export function PostArea() {
             Dodaj post <AddCircleOutlineIcon className={styles.icons} />
           </button>
 
-          <button className={styles.button} onClick={handleJoinCommunity}>
+          {/*
+              Używamy authEmitter.isAuthenticated() żeby sprawdzić czy użytkownik ma token
+              Jeśli nie jest zalogowany - przycisk się nie wyświetla
+
+          */}
+          {isLoggedIn && (
+            <button className={styles.button} onClick={handleJoinCommunity}>
             Dołącz <PersonAddIcon className={styles.icons} />
           </button>
+          )}
+          
         </div>
 
         {isCreatingPost && (

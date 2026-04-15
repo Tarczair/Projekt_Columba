@@ -1,17 +1,40 @@
 import styles from "./Comments.module.css";
 import Comment from "./Comment";
+import { useState, useEffect } from "react";
+import { authEmitter } from "../../../services/authEmitter"; // IMPORT: do sprawdzania czy użytkownik jest zalogowany
 
 export default function Comments() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const updateAuth = () => {
+      setIsLoggedIn(authEmitter.isAuthenticated());
+    };
+
+    updateAuth();
+    authEmitter.subscribe("authChange", updateAuth);
+
+    return () => {
+      authEmitter.unsubscribe("authChange", updateAuth);
+    };
+  }, []);
+
   return (
     <div className={styles.commentContainer}>
-      <div className={styles.addComment}>
-        <textarea
-          className={styles.commentInput}
-          placeholder="Napisz komentarz..."
-          rows={2}
-        />
-        <button className={styles.submitButton}>Dodaj komentarz</button>
-      </div>
+      {/*
+          Używamy authEmitter.isAuthenticated() żeby sprawdzić czy użytkownik ma token
+          Jeśli nie jest zalogowany - cała sekcja dodawania komentarzy się nie wyświetla
+      */}
+      {isLoggedIn && (
+        <div className={styles.addComment}>
+          <textarea
+            className={styles.commentInput}
+            placeholder="Napisz komentarz..."
+            rows={2}
+          />
+          <button className={styles.submitButton}>Dodaj komentarz</button>
+        </div>
+      )}
 
       {/* Przykładowe pokazowe dane przed załączneiem bazy danych*/}
       <div className={styles.commentsList}>

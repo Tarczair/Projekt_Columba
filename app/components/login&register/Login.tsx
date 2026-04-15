@@ -1,10 +1,13 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import styles from "./Login.module.css";
+import { authEmitter } from "../services/authEmitter"; // Tu będzie obserwator do niego wysyłamy z poniższego kodu informację o zalogowaniu. dodatkowo tam mamy też funkcje związane z przechowywaniem tokenu.
+import { useNavigate } from "react-router";
 
 export default function Login() {
   const [identity, setIdentity] = useState("");
   const [password, setPassword] = useState("");
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -19,10 +22,12 @@ export default function Login() {
       const data = await response.json();
 
       if (response.ok && data.token) {
-        // Zapisujemy token JWT w przeglądarce
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/profile";
+        // Zamiast ręcznego zapisywania do localStorage + emitowania eventu, jak to miało miejsce wcześniej
+        // używamy jednej metody która robi wszystko.
+        authEmitter.login(data.token, data.user);
+        navigate("/profile");
+        //window.location.href = "/profile"; to nam ciągle czyści pamięć od nowa i przeglądarka traci dane i wywala dziwne błędy, 
+        // tymczasem navigate działa lepiej bo zachowuje pamięć i działa zgodnie z zasadą SPA - Jedna strona na całą aplikację.
       } else {
         alert(data.error || "Błąd logowania");
       }

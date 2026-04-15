@@ -12,6 +12,7 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import CommentIcon from "@mui/icons-material/Comment";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import { authEmitter } from "../services/authEmitter"; // globalny manager autoryzacji
 
 interface UserProfile {
   id: string;
@@ -36,7 +37,12 @@ export default function Profile() {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token");
+      // ===== UŻYWANIE: authEmitter.getToken() =====
+      // Zamiast bezpośredniego localStorage.getItem("token"),
+      // używamy metody z authEmitter która:
+      // - Sprawdza czy jesteśmy po stronie klienta (typeof window !== "undefined")
+      // - Zwraca token albo null jeśli nie zalogowany
+      const token = authEmitter.getToken();
       if (!token) {
         setLoading(false);
         return;
@@ -162,6 +168,9 @@ export default function Profile() {
             onChange={handleInputChange}
           />
           <div className={styles.name}>
+            {/*
+                W tym przypadku używamy user z API bo chcemy aktualne dane.
+            */}
             <p className={styles.text}>{user.username?.length || 0}/300</p>
             <p className={styles.date}>
               Dołączono: {new Date(user.created_at).toLocaleDateString()}

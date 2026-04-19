@@ -10,17 +10,7 @@ import { authEmitter } from "../services/authEmitter";
 interface Rule {
   rule_title: string;
   description: string;
-} //przechowujemy zasady
-
-const ALL_TAGS = [
-  "Elektronika",
-  "Programowanie",
-  "Lutowanie",
-  "Arduino",
-  "C++",
-  "Vite",
-  "React",
-]; //przechowujemy tagi
+}
 
 export default function Add_community() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +19,22 @@ export default function Add_community() {
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/tags");
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableTags(data);
+        }
+      } catch (error) {
+        console.error("Błąd pobierania tagów:", error);
+      }
+    };
+    fetchTags();
+  }, []);
 
   const [rules, setRules] = useState<Rule[]>([
     { rule_title: "", description: "" },
@@ -42,7 +48,7 @@ export default function Add_community() {
     });
   };
 
-  const filteredTags = ALL_TAGS.filter((tag) =>
+  const filteredTags = availableTags.filter((tag) =>
     tag.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 

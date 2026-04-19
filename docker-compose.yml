@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-  # Baza danych PostgreSQL
   db:
     image: postgres:15-alpine
     restart: always
@@ -15,7 +14,6 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  # Backend (Node.js)
   backend:
     build: ./server
     ports:
@@ -25,17 +23,15 @@ services:
       - JWT_SECRET=twoj_sekret_na_pozniej
     depends_on:
       - db
+    volumes:
+      - ./server/uploads:/app/uploads
 
-  # Frontend (Vite / React)
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.dev # Używamy wersji .dev do programowania
+      dockerfile: Dockerfile.dev
     ports:
       - "5173:5173"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     depends_on:
       - backend
 

@@ -66,6 +66,61 @@ export default function Profile() {
     fetchProfile();
   }, []);
 
+  const handleLeaveCommunity = async (communityName: string) => {
+    if (!communityName) return;
+
+    const fetchLeaveCommunity = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/leavecommunity",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ name: communityName }),
+          },
+        );
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(errorData.error);
+          } else {
+            throw new Error(`Błąd serwera (status ${response.status})`);
+          }
+        }
+
+        if (response.ok) {
+          setUser((prevUser) => {
+            if (!prevUser) return null;
+            return {
+              ...prevUser,
+              communities: prevUser.communities.filter(
+                (c) => c.name !== communityName,
+              ),
+            };
+          });
+
+          alert("Opuściłeś społeczność!");
+        }
+
+        const data = await response.json();
+      } catch (err: any) {
+        err.message;
+      }
+    };
+
+    await fetchLeaveCommunity();
+  };
+
   const toggleCommunities = () => {
     setShowCommunities(true);
     setShowCreatedCommunities(false);
@@ -247,7 +302,10 @@ export default function Profile() {
                   alt=""
                 />
                 <span className={styles.text}>{comm.name}</span>
-                <button className={styles.button}>
+                <button
+                  className={styles.button}
+                  onClick={() => handleLeaveCommunity(comm.name)}
+                >
                   Opuść społeczność <ArrowBackIcon className={styles.icon} />
                 </button>
               </li>

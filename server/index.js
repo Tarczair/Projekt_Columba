@@ -52,11 +52,15 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = userResult.rows[0];
-
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ error: "Nieprawidłowe dane logowania" });
     }
+
+    const commsQuery = await pool.query(
+      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1",
+      [user.id],
+    );
 
     const token = jwt.sign(
       { userId: user.id, username: user.username },
@@ -67,7 +71,14 @@ app.post("/api/login", async (req, res) => {
     res.json({
       message: "Zalogowano pomyślnie!",
       token: token,
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        bio: user.bio,
+        avatar: user.avatar_url,
+        communities: commsQuery.rows,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -143,7 +154,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.post(
   "/api/update_profile",
@@ -189,35 +200,129 @@ app.post(
 app.get("/api/communities/:name", async (req, res) => {
   try {
     const { name } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+    const cursor = req.query.cursor; // To będzie data (ISO string) ostatniego posta
 
-    const community = await pool.query(
-      "SELECT * FROM communities WHERE name ILIKE $1",
+    // 1. Pobierz dane społeczności
+    const communityRes = await pool.query(
+      "SELECT id, name, description, avatar_url, created_at, owner_id FROM communities WHERE name ILIKE $1",
       [name],
     );
 
-    if (community.rows.length === 0)
-      return res.status(404).json({ error: "Brak" });
+    if (communityRes.rows.length === 0)
+      return res.status(404).json({ error: "Brak społeczności" });
+    const community = communityRes.rows[0];
 
-    const communityId = community.rows[0].id;
+    // 2. Budowanie zapytania o posty z kursorem
+    let postsQuery = `
+      SELECT 
+        p.id, p.title, p.post AS text, p.main_image_url AS image, 
+        p.upvotes_count AS upvotes, p.comments_count AS comments,
+        p.is_spoiler, p.created_at,
+        u.username AS "userName", u.avatar_url AS "avatarPath"
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      WHERE p.community_id = $1
+    `;
 
-    const rules = await pool.query(
+    const rulesRes = await pool.query(
       "SELECT rule_title, description FROM rules WHERE community_id = $1",
-      [communityId],
+      [community.id],
     );
 
-    const tags = await pool.query(
-      "SELECT name FROM tags WHERE community_id = $1",
-      [communityId],
-    );
+    const params = [community.id];
+
+    if (cursor) {
+      // Pobieramy tylko posty STARSZE niż kursor
+      postsQuery += ` AND p.created_at < $2`;
+      params.push(cursor);
+    }
+
+    postsQuery += ` ORDER BY p.created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const postsRes = await pool.query(postsQuery, params);
+
+    // 3. Formatowanie wyników
+    const formattedPosts = postsRes.rows.map((p) => ({
+      ...p,
+      avatarPath: p.avatarPath || "/img/pepe_placeholder.png",
+      createdAt: p.created_at, // Wysyłamy surową datę do kursora
+      displayDate: new Date(p.created_at).toLocaleDateString(), // A tę do wyświetlenia
+      tags: [],
+    }));
+
+    // Wyznaczamy nowy kursor (data utworzenia ostatniego pobranego posta)
+    const nextCursor =
+      postsRes.rows.length === limit
+        ? postsRes.rows[postsRes.rows.length - 1].created_at
+        : null;
 
     res.json({
-      ...community.rows[0],
-      rules: rules.rows,
-      tags: tags.rows.map((t) => t.name),
+      ...community,
+      posts: formattedPosts,
+      nextCursor: nextCursor,
+      rules: rulesRes.rows,
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Błąd serwera" });
+  }
+});
+
+app.delete("/api/communities/:name", async (req, res) => {
+  const { name } = req.params;
+
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ error: "Brak tokena" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+
+    const communityRes = await pool.query(
+      `SELECT id, owner_id 
+       FROM communities 
+       WHERE LOWER(name) = LOWER($1)`,
+      [name],
+    );
+
+    if (communityRes.rows.length === 0) {
+      return res.status(404).json({ error: "Nie ma takiej społeczności" });
+    }
+
+    const community = communityRes.rows[0];
+
+    // WAŻNE: owner_id vs userId z JWT
+    if (String(community.owner_id) !== String(decoded.userId)) {
+      return res.status(403).json({ error: "Tylko właściciel może to zrobić" });
+    }
+
+    await pool.query(`DELETE FROM communities WHERE id = $1`, [community.id]);
+
+    return res.json({ message: "Społeczność usunięta pomyślnie" });
+  } catch (err) {
+    console.error("DELETE community error:", err);
+
+    if (err.name === "JsonWebTokenError") {
+      return res.status(401).json({ error: "Nieprawidłowy token" });
+    }
+
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/tags", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT name FROM tags ORDER BY name ASC");
+    const tags = result.rows.map((row) => row.name);
+    res.json(tags);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd pobierania tagów z bazy" });
   }
 });
 
@@ -268,13 +373,14 @@ app.post(
       }
 
       if (tags.length > 0) {
-        for (const tag of tags) {
-          const tagName = typeof tag === "string" ? tag : tag.name;
-
+        const tagIdsRes = await client.query(
+          "SELECT id FROM tags WHERE name = ANY($1)",
+          [tags],
+        );
+        for (const row of tagIdsRes.rows) {
           await client.query(
-            `INSERT INTO tags (community_id, name) 
-             VALUES ($1, $2)`,
-            [communityId, tagName],
+            "INSERT INTO community_tags (community_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [communityId, row.id],
           );
         }
       }
@@ -303,47 +409,298 @@ app.post(
 );
 
 app.post(
-  "/api/joincommunity",
+  "/api/leavecommunity",
   authenticateToken,
-  express.text(),
+  express.json(),
   async (req, res) => {
     const client = await pool.connect();
     try {
-      const name = req.body;
+      const { name } = req.body;
       const userId = req.user.userId;
+
+      if (!name) {
+        return res
+          .status(400)
+          .json({ error: "Brak nazwy społeczności w body." });
+      }
 
       await client.query("BEGIN");
 
       const result = await client.query(
-        `SELECT id FROM communities WHERE name = $1`,
+        "SELECT id FROM communities WHERE name = $1",
         [name],
       );
-
-      const communityId = result.rows[0].id;
 
       if (result.rows.length === 0) {
         throw new Error("Społeczność o tej nazwie nie istnieje.");
       }
 
+      const communityId = result.rows[0].id;
+
       await client.query(
-        `INSERT INTO community_members (community_id, user_id) 
-         VALUES ($1, $2)`,
+        "DELETE FROM community_members WHERE community_id=$1 AND user_id=$2",
         [communityId, userId],
       );
 
       await client.query("COMMIT");
 
-      res.status(201).json({
-        message: "Dołączono do społeczności!",
+      res.status(200).json({
+        message: "Opuściłeś społeczność!",
         communityId: communityId,
       });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("Błąd dołączenia do społeczności:", err);
+      console.error("Błąd API leavecommunity:", err.message);
 
       res.status(500).json({
         error: err.message,
       });
+    } finally {
+      client.release();
     }
   },
 );
+
+app.post(
+  "/api/joincommunity",
+  authenticateToken,
+  express.json(),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { name } = req.body;
+      const userId = req.user.userId;
+
+      if (!name) {
+        return res.status(400).json({ error: "Brak nazwy społeczności." });
+      }
+
+      await client.query("BEGIN");
+
+      // 1. znajdź community
+      const communityRes = await client.query(
+        `SELECT id, owner_id FROM communities WHERE name = $1`,
+        [name],
+      );
+
+      if (communityRes.rows.length === 0) {
+        throw new Error("Społeczność nie istnieje.");
+      }
+
+      const community = communityRes.rows[0];
+
+      // 🔥 2. BLOKADA: owner NIE MOŻE DOŁĄCZAĆ
+      if (String(community.owner_id) === String(userId)) {
+        return res.status(403).json({
+          error: "Właściciel nie może dołączać do swojej społeczności",
+        });
+      }
+
+      // 3. sprawdź czy już jest członkiem (opcjonalnie ale polecam)
+      const check = await client.query(
+        `SELECT 1 FROM community_members 
+         WHERE community_id = $1 AND user_id = $2`,
+        [community.id, userId],
+      );
+
+      if (check.rows.length > 0) {
+        return res.status(400).json({
+          error: "Już jesteś członkiem tej społeczności",
+        });
+      }
+
+      // 4. insert
+      await client.query(
+        `INSERT INTO community_members (community_id, user_id) 
+         VALUES ($1, $2)`,
+        [community.id, userId],
+      );
+
+      await client.query("COMMIT");
+
+      return res.json({ message: "Dołączono do społeczności!" });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("JOIN error:", err);
+
+      return res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  },
+);
+
+const slugify = require("slugify");
+
+app.post(
+  "/api/addpost",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { title, post, community_name } = req.body;
+      const userId = req.user.userId;
+
+      if (!title || !post || !community_name) {
+        return res
+          .status(400)
+          .json({ error: "Tytuł, treść i nazwa społeczności są wymagane." });
+      }
+
+      let imageUrl = null;
+      if (req.file) {
+        imageUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      }
+
+      await client.query("BEGIN");
+
+      const communityRes = await client.query(
+        "SELECT id FROM communities WHERE name = $1",
+        [community_name],
+      );
+
+      if (communityRes.rows.length === 0) {
+        throw new Error("Społeczność nie istnieje.");
+      }
+
+      const communityId = communityRes.rows[0].id;
+
+      const baseSlug = slugify(title, { lower: true, strict: true });
+      const uniqueSlug = `${baseSlug}-${Date.now()}`;
+
+      const postResult = await client.query(
+        `INSERT INTO posts (title, post, main_image_url, slug, user_id, community_id, is_spoiler) 
+   VALUES ($1, $2, $3, $4, $5, $6, $7) 
+   RETURNING id, slug`,
+        [
+          title,
+          post,
+          imageUrl,
+          uniqueSlug,
+          userId,
+          communityId,
+          req.body.is_spoiler === "true",
+        ],
+      );
+
+      const newPostId = postResult.rows[0].id;
+
+      if (req.body.tags) {
+        const parsedTags = JSON.parse(req.body.tags);
+        if (parsedTags.length > 0) {
+          const tagIdsRes = await client.query(
+            "SELECT id FROM tags WHERE name = ANY($1)",
+            [parsedTags],
+          );
+          for (const row of tagIdsRes.rows) {
+            await client.query(
+              "INSERT INTO post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+              [newPostId, row.id],
+            );
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message: "Post został dodany!",
+        postId: postResult.rows[0].id,
+        slug: postResult.rows[0].slug,
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Błąd dodawania posta:", err);
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  },
+);
+
+app.get("/api/communities/:name/posts", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Pobieramy posty dołączając dane autora
+    const posts = await pool.query(
+      `SELECT 
+        p.id, p.title, p.post as text, p.main_image_url as image, 
+        p.created_at, p.slug, u.username, u.avatar_url as author_avatar
+       FROM posts p
+       JOIN communities c ON p.community_id = c.id
+       LEFT JOIN users u ON p.user_id = u.id
+       WHERE c.name ILIKE $1 AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [name, limit, offset],
+    );
+
+    res.json(posts.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/homefeed", async (req, res) => {
+  try {
+    // Zwraca do 10 społeczności, a z każdej najnowszy post (o ile istnieje)
+    const result = await pool.query(`
+      SELECT 
+        c.id AS community_id,
+        c.owner_id,
+        c.name AS community_name, 
+        c.avatar_url AS community_avatar,
+        p.id AS post_id, 
+        p.title, 
+        p.post AS text, 
+        p.main_image_url AS image, 
+        p.created_at, 
+        p.is_spoiler,
+        u.username AS user_name, 
+        u.avatar_url AS author_avatar
+      FROM communities c
+      JOIN LATERAL (
+          SELECT * FROM posts 
+          WHERE community_id = c.id 
+          ORDER BY created_at DESC 
+          LIMIT 1
+      ) p ON true
+      LEFT JOIN users u ON p.user_id = u.id
+      ORDER BY RANDOM() 
+      LIMIT 10;
+    `);
+
+    const feedData = result.rows.map((row) => ({
+      communityId: row.community_id,
+      owner_id: row.owner_id,
+
+      communityName: row.community_name,
+      avatar: row.community_avatar || "/img/pepe_placeholder.png",
+      post: {
+        id: row.post_id,
+        avatarPath: row.author_avatar || "/img/pepe_placeholder.png",
+        userName: row.user_name || "Anonim",
+        title: row.title,
+        text: row.text,
+        tags: [],
+        image: row.image || "",
+        upvotes: 0,
+        isRemoved: false,
+        createdAt: new Date(row.created_at).toLocaleDateString(),
+        comments: 0,
+      },
+    }));
+
+    res.json(feedData);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd ładowania homefeed" });
+  }
+});

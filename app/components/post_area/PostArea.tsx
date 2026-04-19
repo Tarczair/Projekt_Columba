@@ -1,153 +1,269 @@
 import styles from "./PostArea.module.css";
-import pepe from "../../../public/img/pepe_placeholder.png"; // Użyjemy tego jako fallbacku!
+import pepe from "../../../public/img/pepe_placeholder.png";
 import SettingsIcon from "@mui/icons-material/Settings";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
+import LogoutIcon from "@mui/icons-material/Logout";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import { Post } from "./posts/Post";
 import { Sidebar } from "./sidebar/Sidebar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import CreatePost from "./CreatePost/CreatePost";
-import { Link, useParams } from "react-router";
-import { authEmitter } from "../services/authEmitter"; // IMPORT: do sprawdzania czy użytkownik jest zalogowany
+import { Link, useParams, useNavigate } from "react-router"; // Dodany useNavigate
+import { authEmitter } from "../services/authEmitter";
 
-interface Rule {
+export interface Rule {
   rule_title: string;
   description: string;
 }
 
-interface CommunityData {
+export interface UserRole {
+  role: "member" | "moderator" | "admin";
+  can_delete_posts: boolean;
+  can_ban_users: boolean;
+  can_manage_mods: boolean;
+}
+
+export interface CommunityData {
   id: string;
   name: string;
   description: string;
   avatar_url: string | null;
+  owner_id: string;
   created_at: string;
   rules: Rule[];
   tags: string[];
+  currentUserRole: UserRole | null;
 }
 
 export function PostArea() {
   const { communityName } = useParams();
+  const navigate = useNavigate();
 
+  const [isMember, setIsMember] = useState(false);
   const [isCreatingPost, setIsCreatingPost] = useState(false);
   const [communityData, setCommunityData] = useState<CommunityData | null>(
     null,
   );
+  const [posts, setPosts] = useState<any[]>([]);
+
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isPostsLoading, setIsPostsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const toggleCreatePost = () => {
-    setIsCreatingPost(!isCreatingPost);
-  };
+  const currentUser = authEmitter.getUser();
+  const isOwner =
+    currentUser && communityData && currentUser.id === communityData.owner_id;
 
-  useEffect(() => {
-    const updateAuth = () => {
-      setIsLoggedIn(authEmitter.isAuthenticated());
-    };
+  const toggleCreatePost = () => setIsCreatingPost(!isCreatingPost);
 
-    updateAuth();
-    authEmitter.subscribe("authChange", updateAuth);
+  const loadPosts = useCallback(
+    async (cursor: string | null = null) => {
+      if (isPostsLoading || (!hasMore && cursor !== null)) return;
 
-    return () => {
-      authEmitter.unsubscribe("authChange", updateAuth);
-    };
-  }, []);
-
-  useEffect(() => {
-    const fetchCommunity = async () => {
+      setIsPostsLoading(true);
       try {
-        const response = await fetch(
-          `http://localhost:5000/api/communities/${communityName}`,
-        );
+        const url = `http://localhost:5000/api/communities/${communityName}?limit=10${cursor ? `&cursor=${cursor}` : ""}`;
+        const response = await fetch(url);
 
-        if (!response.ok) {
-          throw new Error("Nie znaleziono społeczności (404)");
-        }
+        if (!response.ok) throw new Error("Błąd pobierania danych");
 
         const data = await response.json();
-        setCommunityData(data);
+
+        if (cursor === null) {
+          setCommunityData(data);
+          setPosts(data.posts || []);
+        } else {
+          setPosts((prev) => [...prev, ...(data.posts || [])]);
+        }
+
+        setNextCursor(data.nextCursor);
+        setHasMore(data.nextCursor !== null);
       } catch (err: any) {
         setError(err.message);
       } finally {
+        setIsPostsLoading(false);
         setIsLoading(false);
       }
-    };
+    },
+    [communityName, hasMore, isPostsLoading],
+  );
 
-    if (communityName) {
-      fetchCommunity();
+  const handleDeleteCommunity = async () => {
+    if (
+      !window.confirm(
+        `CZY NA PEWNO CHCESZ TRWALE USUNĄĆ SPOŁECZNOŚĆ ${communityName}?`,
+      )
+    )
+      return;
+
+    const token = authEmitter.getToken();
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/communities/${communityName}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (res.ok) {
+        alert("Społeczność została usunięta.");
+        navigate("/");
+      } else {
+        const data = await res.json();
+        alert(data.error || "Błąd podczas usuwania");
+      }
+    } catch (err) {
+      alert("Błąd serwera");
     }
-  }, [communityName]);
+  };
 
   const handleJoinCommunity = async () => {
     if (!communityName) return;
 
-    const fetchJoinCommunity = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        return;
-      }
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-      setIsLoading(true);
+    setIsLoading(true);
 
-      try {
-        const response = await fetch(
-          "http://localhost:5000/api/joincommunity",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "text/plain",
-              Authorization: `Bearer ${token}`,
-            },
-            body: communityName,
-          },
-        );
+    try {
+      const response = await fetch("http://localhost:5000/api/joincommunity", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: communityName }),
+      });
 
-        if (!response.ok) {
-          const contentType = response.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const errorData = await response.json();
-            throw new Error(errorData.error);
-          } else {
-            throw new Error(`Błąd serwera (status ${response.status})`);
-          }
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error);
+        } else {
+          throw new Error(`Błąd serwera (status ${response.status})`);
         }
-
-        const data = await response.json();
-        console.log("Sukces:", data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
       }
-    };
 
-    await fetchJoinCommunity();
+      const currentUser = authEmitter.getUser();
+
+      if (currentUser) {
+        const updatedCommunities = currentUser.communities
+          ? [...currentUser.communities]
+          : [];
+
+        updatedCommunities.push({ name: communityName });
+
+        const updatedUser = {
+          ...currentUser,
+          communities: updatedCommunities,
+        };
+
+        authEmitter.login(token, updatedUser);
+      }
+
+      setIsMember(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const posts = [
-    {
-      id: 1,
-      avatarPath: "/img/pepe_placeholder.png",
-      userName: "Użytkownik 1",
-      title: "Przykładowy pierwszy post",
-      text: "Lorem ipsum dolor sit amet, consectetur adipisicing elit.",
-      tags: ["tag_1", "Tag_2"],
-      image: "/img/golab.png",
-      upvotes: 120,
-      isRemoved: false,
-      createdAt: "2h temu",
-      comments: 4,
-    },
-  ];
+  const handleLeaveCommunity = async () => {
+    if (!communityName) return;
 
-  if (isLoading) {
-    return <div className={styles.pageWrapper}>Ładowanie społeczności...</div>;
-  }
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:5000/api/leavecommunity", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: communityName }),
+      });
+
+      const currentUser = authEmitter.getUser();
+
+      if (currentUser && currentUser.communities) {
+        const updatedCommunities = currentUser.communities.filter(
+          (c: any) => c.name.toLowerCase() !== communityName.toLowerCase(),
+        );
+
+        const updatedUser = {
+          ...currentUser,
+          communities: updatedCommunities,
+        };
+
+        authEmitter.login(token, updatedUser);
+      }
+
+      if (!response.ok) {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error);
+        } else {
+          throw new Error(`Błąd serwera (status ${response.status})`);
+        }
+      }
+
+      setIsMember(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setIsLoggedIn(authEmitter.isAuthenticated());
+    const updateAuth = () => setIsLoggedIn(authEmitter.isAuthenticated());
+    authEmitter.subscribe("authChange", updateAuth);
+    return () => authEmitter.unsubscribe("authChange", updateAuth);
+  }, []);
+
+  useEffect(() => {
+    if (communityName) {
+      setPosts([]);
+      setNextCursor(null);
+      setHasMore(true);
+      loadPosts(null);
+      setIsMember(authEmitter.isMemberOf(communityName));
+    }
+  }, [communityName]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+          document.body.offsetHeight - 800 &&
+        hasMore &&
+        !isPostsLoading &&
+        nextCursor
+      ) {
+        loadPosts(nextCursor);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [nextCursor, hasMore, isPostsLoading, loadPosts]);
+
+  if (isLoading) return <div className={styles.pageWrapper}>Ładowanie...</div>;
   if (error || !communityData) {
     return (
       <div className={styles.pageWrapper}>
-        <h1>{error || "Społeczność nie istnieje"}</h1>
+        <h1>{error || "Nie znaleziono społeczności"}</h1>
         <Link to="/">Wróć na stronę główną</Link>
       </div>
     );
@@ -157,66 +273,76 @@ export function PostArea() {
     <div className={styles.pageWrapper}>
       <div className={styles.postArea}>
         <div className={styles.community}>
-          <div>
+          <div className={styles.communityHeader}>
             <img
               src={communityData.avatar_url || pepe}
               className={styles.communityLogo}
-              alt={`${communityData.name} logo`}
+              alt="logo"
             />
             <h1 className={styles.text}>{communityData.name}</h1>
 
-            <Link to="/communities_settings">
-              <button className={styles.settings}>
-                <SettingsIcon className={styles.icons} />
-              </button>
-            </Link>
+            {(isOwner || communityData.currentUserRole?.role === "admin") && (
+              <Link to="/communities_settings">
+                <button className={styles.settings}>
+                  <SettingsIcon className={styles.icons} />
+                </button>
+              </Link>
+            )}
           </div>
 
-          <button className={styles.button} onClick={toggleCreatePost}>
-            Dodaj post <AddCircleOutlineIcon className={styles.icons} />
-          </button>
-
-          {/*
-              Używamy authEmitter.isAuthenticated() żeby sprawdzić czy użytkownik ma token
-              Jeśli nie jest zalogowany - przycisk się nie wyświetla
-
-          */}
-          {isLoggedIn && (
-            <button className={styles.button} onClick={handleJoinCommunity}>
-            Dołącz <PersonAddIcon className={styles.icons} />
-          </button>
+          {isLoggedIn && (isMember || isOwner) && (
+            <button className={styles.button} onClick={toggleCreatePost}>
+              Dodaj post <AddCircleOutlineIcon className={styles.icons} />
+            </button>
           )}
-          
+
+          {isLoggedIn &&
+            (isOwner ? (
+              <button
+                className={`${styles.button} ${styles.deleteBtn}`}
+                onClick={handleDeleteCommunity}
+                style={{ backgroundColor: "#ff4444", color: "white" }}
+              >
+                USUŃ SPOŁECZNOŚĆ <DeleteForeverIcon className={styles.icons} />
+              </button>
+            ) : isMember ? (
+              <button className={styles.button} onClick={handleLeaveCommunity}>
+                Opuść <LogoutIcon className={styles.icons} />
+              </button>
+            ) : (
+              <button className={styles.button} onClick={handleJoinCommunity}>
+                Dołącz <PersonAddIcon className={styles.icons} />
+              </button>
+            ))}
         </div>
 
-        {isCreatingPost && (
-          <div className={styles.createPostForm}>
-            <CreatePost />
-          </div>
-        )}
+        {isCreatingPost && <CreatePost />}
 
-        {posts.map((post) => (
-          <Post
-            key={post.id}
-            avatarPath={post.avatarPath}
-            userName={post.userName}
-            title={post.title}
-            image={post.image}
-            text={post.text}
-            tags={post.tags}
-            upvotes={post.upvotes}
-            isRemoved={post.isRemoved}
-            createdAt={post.createdAt}
-            comments={post.comments}
-          />
-        ))}
+        <div className={styles.postsList}>
+          {posts.map((post) => (
+            <Post
+              key={post.id}
+              {...post}
+              tags={post.tags || []}
+              createdAt={post.displayDate || post.createdAt}
+            />
+          ))}
+
+          {isPostsLoading && (
+            <p className={styles.loadingMore}>Ładowanie postów...</p>
+          )}
+          {!hasMore && posts.length > 0 && (
+            <p className={styles.noMore}>To już wszystkie posty.</p>
+          )}
+        </div>
       </div>
+
       <Sidebar
         name={communityData.name}
         description={communityData.description}
         createdAt={communityData.created_at}
-        rules={communityData.rules}
-        tags={communityData.tags}
+        rules={communityData.rules || []}
+        tags={communityData.tags || []}
       />
     </div>
   );

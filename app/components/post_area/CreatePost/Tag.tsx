@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import styles from "./Tag.module.css";
 import SearchIcon from "@mui/icons-material/Search";
 import CheckIcon from "@mui/icons-material/Check";
@@ -10,19 +10,25 @@ interface TagProps {
   currentTags: string[];
 }
 
-const ALL_TAGS = [
-  "Elektronika",
-  "Programowanie",
-  "Lutowanie",
-  "Arduino",
-  "C++",
-  "Vite",
-  "React",
-];
-
 export default function Tag({ onClose, onConfirm, currentTags }: TagProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>(currentTags);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/tags");
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableTags(data);
+        }
+      } catch (error) {
+        console.error("Błąd pobierania tagów:", error);
+      }
+    };
+    fetchTags();
+  }, []);
 
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
@@ -30,7 +36,7 @@ export default function Tag({ onClose, onConfirm, currentTags }: TagProps) {
     );
   };
 
-  const filteredTags = ALL_TAGS.filter((tag) =>
+  const filteredTags = availableTags.filter((tag) =>
     tag.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 

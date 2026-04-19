@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS posts (
     upvotes_count INTEGER DEFAULT 0,
     comments_count INTEGER DEFAULT 0,
     search_vector tsvector,
+    is_spoiler BOOLEAN DEFAULT false, -- DODANE: Obsługa spoilera
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -116,9 +117,13 @@ CREATE TABLE IF NOT EXISTS friendships (
 
 CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS community_tags (
     community_id UUID REFERENCES communities(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    UNIQUE(community_id, name)
+    tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (community_id, tag_id)
 );
 
 CREATE TABLE IF NOT EXISTS post_tags (
@@ -163,21 +168,15 @@ CREATE TABLE IF NOT EXISTS media (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS notifications (
+/*nie wiem czy to bedziemy dodawac czy nie zobaczymy jak bedziemy z czasem stac*/
+
+/*CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS users_settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    dark_mode BOOLEAN DEFAULT false,
-    email_alerts BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+);*/
 
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

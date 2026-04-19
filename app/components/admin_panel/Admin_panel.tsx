@@ -7,6 +7,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CheckIcon from "@mui/icons-material/Check";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import type { UserRole } from "../post_area/PostArea";
 
 interface Report {
   id: number;
@@ -15,7 +16,11 @@ interface Report {
   rule: string;
 }
 
-export default function Admin_panel() {
+interface AdminPanelProps {
+  role?: UserRole | null;
+}
+
+export default function Admin_panel({ role }: AdminPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [communityName, setCommunityName] = useState(
     "AKTUALNA NAZWA SPOŁECZNOŚCI",
@@ -346,18 +351,19 @@ export default function Admin_panel() {
                   />
                   <span className={styles.name}>{user.name}</span>
 
-                  <button
-                    type="button"
-                    onClick={() => toggleMod(user.id)}
-                    className={user.isMod ? styles.isMod : styles.notMod}
-                    disabled={user.isBanned}
-                  >
-                    {user.isMod
-                      ? "ODBIERZ MODERATORA"
-                      : "DODAJ JAKO MODERATORA"}
-                    <PersonAddIcon className={styles.icon} />
-                  </button>
-
+                  {role?.can_manage_mods && (
+                    <button
+                      type="button"
+                      onClick={() => toggleMod(user.id)}
+                      className={user.isMod ? styles.isMod : styles.notMod}
+                      disabled={user.isBanned}
+                    >
+                      {user.isMod
+                        ? "ODBIERZ MODERATORA"
+                        : "DODAJ JAKO MODERATORA"}
+                      <PersonAddIcon className={styles.icon} />
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => toggleBan(user.id)}

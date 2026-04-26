@@ -13,6 +13,7 @@ import { authEmitter } from "../services/authEmitter"; //emiter który będzie p
 
 export function Header() {
   const [isMenuOpen, setMenuOpen] = useState(false);
+  const [menuVersion, setMenuVersion] = useState(0);
 
   const toogleMenu = () => setMenuOpen(!isMenuOpen);
 
@@ -46,9 +47,16 @@ const [isLoggedIn, setIsLoggedIn] = useState(() => {
     };
 
     authEmitter.subscribe("authChange", handleAuthChange); //zasubskrybowanie czyli sprawienie że obserwator wysyła mu zmiane stanu. 
+    const handleMenuUpdate = () => setMenuVersion((prev) => prev + 1);
+    authEmitter.subscribe("membersChanged", handleMenuUpdate);
+    authEmitter.subscribe("reportsChanged", handleMenuUpdate);
+    authEmitter.subscribe("bansChanged", handleMenuUpdate);
 
     return () => {
       authEmitter.unsubscribe("authChange", handleAuthChange); //funkcja czyszcząca, zabezpieczenie przed wyciekiem pamięci. 
+      authEmitter.unsubscribe("membersChanged", handleMenuUpdate);
+      authEmitter.unsubscribe("reportsChanged", handleMenuUpdate);
+      authEmitter.unsubscribe("bansChanged", handleMenuUpdate);
     };
   }, []); //pusta tablica na końcu mówi że ma się wykonać tylko raz.
 

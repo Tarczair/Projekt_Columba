@@ -8,6 +8,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CheckIcon from "@mui/icons-material/Check";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import { authEmitter } from "../services/authEmitter";
 import type { UserRole } from "../post_area/PostArea";
 
 interface Report {
@@ -110,50 +111,55 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
 
   // === 3. FUNKCJE LOGICZNE ===
 
-  const toggleBan = async (id: string) => {
-    // Pobierz token autoryzacyjny z localStorage
-    const token = localStorage.getItem("token");
-    // Znajdź użytkownika w liście użytkowników na podstawie ID
-    const user = users.find((u) => u.id === id);
-    // Jeśli użytkownik nie istnieje, zakończ funkcję
-    if (!user) return;
+const toggleBan = async (id: string) => {
+  const token = localStorage.getItem("token");
+  const user = users.find((u) => u.id === id);
+  if (!user) return;
 
-    // Sprawdź, czy użytkownik jest obecnie zbanowany
-    const isCurrentlyBanned = user.isBanned;
-    // Określ akcję na podstawie aktualnego statusu (ban lub unban)
-    const action = isCurrentlyBanned ? "ODBANUJ" : "ZBANUJ";
-    // Wyświetl okno potwierdzenia z odpowiednią akcją
-    if (!window.confirm(`Czy na pewno chcesz ${action.toLowerCase()} tego użytkownika?`)) return;
+  const isCurrentlyBanned = user.isBanned;
+  const action = isCurrentlyBanned ? "ODBANUJ" : "ZBANUJ";
 
-    try {
-      // Wyślij POST request do odpowiedniego endpointu: ban-user lub unban-user
-      const endpoint = isCurrentlyBanned ? "unban-user" : "ban-user";
-      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/${endpoint}`, {
+  if (!window.confirm(`Czy na pewno chcesz ${action.toLowerCase()} tego użytkownika?`)) return;
+
+  try {
+    const endpoint = isCurrentlyBanned ? "unban-user" : "ban-user";
+
+    const res = await fetch(
+      `http://localhost:5000/api/communities/${communityId}/${endpoint}`,
+      {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ userId: id })
+        body: JSON.stringify({ userId: id }),
+      }
+    );
+
+    if (res.ok) {
+      
+      await fetchMembers();
+
+     
+      authEmitter.emit("membersChanged");
+      authEmitter.emit("bansChanged");
+
+      
+      authEmitter.emit("authChange", {
+        isLoggedIn: authEmitter.isAuthenticated(),
       });
 
-      // Jeśli request się powiódł (status 200-299)
-      if (res.ok) {
-        // Odśwież dane z backendu
-        await fetchMembers();
-        // Wyświetl alert z informacją o sukcesie
-        alert(`Użytkownik został ${isCurrentlyBanned ? "odbanowany" : "zbanowany"}!`);
-      } else {
-        // Jeśli request nie powiódł się, wyświetl alert o błędzie
-        alert("Błąd podczas zmiany statusu użytkownika");
-      }
-    } catch (err) {
-      // W przypadku błędu połączenia, zaloguj błąd do konsoli
-      console.error("Błąd połączenia:", err);
-      // Wyświetl alert o błędzie połączenia
-      alert("Błąd połączenia z serwerem");
+      alert(
+        `Użytkownik został ${isCurrentlyBanned ? "odbanowany" : "zbanowany"}!`
+      );
+    } else {
+      alert("Błąd podczas zmiany statusu użytkownika");
     }
-  };
+  } catch (err) {
+    console.error("Błąd połączenia:", err);
+    alert("Błąd połączenia z serwerem");
+  }
+};
 
   const openModModal = (id: string) => {
     const user = users.find((u) => u.id === id);
@@ -210,6 +216,7 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
       });
       if (res.ok) {
         setReports(prev => prev.filter(r => r.id !== reportId));
+        authEmitter.emit("reportsChanged");
       }
     } catch (err) {
       console.error("Błąd usuwania zgłoszenia:", err);
@@ -228,7 +235,16 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
         body: JSON.stringify({ userId: reportedUserId, reportId: reportId })
       });
       if (res.ok) {
-        setReports((prev) => prev.filter(r => r.reported_user_id !== reportedUserId));
+        setReports((prev) =>
+          prev.filter((r) => r.reported_user_id !== reportedUserId)
+        );
+
+        authEmitter.emit("reportsChanged");
+        authEmitter.emit("bansChanged");
+
+
+        authEmitter.emit("membersChanged");
+
         alert("Użytkownik zbanowany!");
       }
     } catch (err) {

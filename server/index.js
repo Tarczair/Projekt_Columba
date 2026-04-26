@@ -8,6 +8,19 @@ const app = express();
 
 const JWT_SECRET = process.env.JWT_SECRET || "twoj_bardzo_tajny_klucz_123";
 
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Wyciąga "TOKEN" z "Bearer TOKEN"
+
+  if (!token) return res.status(401).json({ error: "Brak dostępu" });
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) return res.status(403).json({ error: "Token nieważny" });
+    req.user = user;
+    next();
+  });
+};
+
 app.use(cors());
 app.use(express.json());
 app.use(express.text());
@@ -88,22 +101,97 @@ app.post("/api/login", async (req, res) => {
 
 app.get("/", (req, res) => res.send("Backend działa i słucha!"));
 
+// 1. Pobieranie listy członków danej społeczności (do listy w panelu)
+app.get("/api/communities/:communityId/members", authenticateToken, async (req, res) => {
+  try {
+    const { communityId } = req.params;
+    const members = await pool.query(
+      `SELECT u.id, u.username, u.avatar_url, cm.role, cm.status, 
+              cm.can_delete_posts, cm.can_ban_users, cm.can_manage_mods
+       FROM community_members cm
+       JOIN users u ON cm.user_id = u.id
+       WHERE cm.community_id = $1`,
+      [communityId]
+    );
+    res.json(members.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Aktualizacja uprawnień moderatora
+app.post("/api/communities/:communityId/members/:userId/permissions", authenticateToken, async (req, res) => {
+  const { communityId, userId } = req.params;
+  const { can_delete_posts, can_ban_users, can_manage_mods, role } = req.body;
+  const requesterId = req.user.userId;
+
+  try {
+    // Sprawdzenie czy żądający to owner
+    const ownerCheck = await pool.query(
+      "SELECT 1 FROM communities WHERE id = $1 AND owner_id = $2",
+      [communityId, requesterId]
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Tylko właściciel może to robić" });
+    }
+
+    await pool.query(
+      `UPDATE community_members 
+       SET role = $1, can_delete_posts = $2, can_ban_users = $3, can_manage_mods = $4
+       WHERE community_id = $5 AND user_id = $6`,
+      [role, can_delete_posts, can_ban_users, can_manage_mods, communityId, userId]
+    );
+
+    res.json({ message: "Uprawnienia zaktualizowane!" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Pobieranie zgłoszeń dla danej społeczności (do dolnej tabeli)
+app.get("/api/communities/:communityId/reports", authenticateToken, async (req, res) => {
+  try {
+    const { communityId } = req.params;
+    const reports = await pool.query(
+      `SELECT r.id, u.username as reporter, p.title as "postTitle", ru.rule_title as rule, r.status
+       FROM reports r
+       JOIN users u ON r.reporter_id = u.id
+       JOIN posts p ON r.post_id = p.id
+       JOIN rules ru ON r.rule_id = ru.id
+       WHERE r.community_id = $1 AND r.status = 'pending'`,
+      [communityId]
+    );
+    res.json(reports.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Pobieranie szczegółów społeczności po ID
+app.get("/api/communities-by-id/:communityId", authenticateToken, async (req, res) => {
+  try {
+    const { communityId } = req.params;
+    const result = await pool.query(
+      "SELECT name, description, avatar_url FROM communities WHERE id = $1",
+      [communityId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Nie znaleziono społeczności" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(5000, "0.0.0.0", () => {
   console.log("Serwer Node śmiga na porcie 5000");
 });
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1]; // Wyciąga "TOKEN" z "Bearer TOKEN"
 
-  if (!token) return res.status(401).json({ error: "Brak dostępu" });
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Token nieważny" });
-    req.user = user;
-    next();
-  });
-};
 
 app.get("/api/me", authenticateToken, async (req, res) => {
   try {

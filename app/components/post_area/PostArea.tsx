@@ -335,7 +335,7 @@ export function PostArea() {
             <h1 className={styles.text}>{communityData.name}</h1>
 
             {(isOwner || communityData.currentUserRole?.role === "admin") && (
-              <Link to="/communities_settings">
+              <Link to={`/communities_settings/${communityData.id}`}>
                 <button className={styles.settings}>
                   <SettingsIcon className={styles.icons} />
                 </button>

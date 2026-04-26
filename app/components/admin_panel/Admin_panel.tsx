@@ -21,6 +21,18 @@ interface AdminPanelProps {
 }
 
 export default function Admin_panel({ role }: AdminPanelProps) {
+  // === STANY I HOOKI SĄ TERAZ BEZPIECZNIE W ŚRODKU ===
+  const [modModal, setModModal] = useState<{ isOpen: boolean; userId: number | null }>({
+    isOpen: false,
+    userId: null,
+  });
+
+  const [tempPermissions, setTempPermissions] = useState({
+    can_delete_posts: false,
+    can_ban_users: false,
+    can_manage_mods: false,
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [communityName, setCommunityName] = useState(
     "AKTUALNA NAZWA SPOŁECZNOŚCI",
@@ -36,6 +48,7 @@ export default function Admin_panel({ role }: AdminPanelProps) {
       avatarPath: "/img/pepe_placeholder.png",
       isBanned: false,
       isMod: false,
+      permissions: { can_delete_posts: false, can_ban_users: false, can_manage_mods: false },
     },
     {
       id: 2,
@@ -172,61 +185,61 @@ export default function Admin_panel({ role }: AdminPanelProps) {
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 3,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 4,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 5,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 6,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 7,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 8,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 9,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 10,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 11,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
     },
     {
-      id: 2,
+      id: 12,
       reporter: "NAZWA ZGŁASZAJĄCEGO",
       postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
       rule: "ZASADA NR 1",
@@ -255,11 +268,38 @@ export default function Admin_panel({ role }: AdminPanelProps) {
     );
   };
 
-  const toggleMod = (id: number) => {
+  const openModModal = (id: number) => {
+    const user = users.find((u) => u.id === id);
+    if (user) {
+      setTempPermissions(
+        (user as any).permissions || {
+          can_delete_posts: false,
+          can_ban_users: false,
+          can_manage_mods: false,
+        }
+      );
+      setModModal({ isOpen: true, userId: id });
+    }
+  };
+
+  const saveModPermissions = () => {
     setUsers((prevUsers) =>
       prevUsers.map((user) =>
-        user.id === id ? { ...user, isMod: !user.isMod } : user,
-      ),
+        user.id === modModal.userId
+          ? { ...user, isMod: true, permissions: tempPermissions }
+          : user
+      )
+    );
+    setModModal({ isOpen: false, userId: null });
+  };
+
+  const removeMod = (id: number) => {
+    setUsers((prevUsers) =>
+      prevUsers.map((user) =>
+        user.id === id
+          ? { ...user, isMod: false }
+          : user
+      )
     );
   };
 
@@ -354,7 +394,7 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                   {role?.can_manage_mods && (
                     <button
                       type="button"
-                      onClick={() => toggleMod(user.id)}
+                      onClick={() => user.isMod ? removeMod(user.id) : openModModal(user.id)}
                       className={user.isMod ? styles.isMod : styles.notMod}
                       disabled={user.isBanned}
                     >
@@ -427,6 +467,61 @@ export default function Admin_panel({ role }: AdminPanelProps) {
           </div>
         </div>
       </div>
+
+      {/* KOD OKIENKA NADAWANIA UPRAWNIEŃ */}
+      {modModal.isOpen && (
+        <div className={styles.modalOverlay} onClick={() => setModModal({ isOpen: false, userId: null })}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: 'white', marginBottom: '20px' }}>UPRAWNIENIA MODERATORA</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', color: 'white' }}>
+              <label style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <span>USUWANIE POSTÓW <DeleteIcon fontSize="small"/></span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_delete_posts}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_delete_posts: e.target.checked})}
+                />
+              </label>
+
+              <label style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <span>BANOWANIE UŻYTKOWNIKÓW <GavelIcon fontSize="small"/></span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_ban_users}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_ban_users: e.target.checked})}
+                />
+              </label>
+
+              <label style={{ display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }}>
+                <span>WYZNACZANIE MODERATORÓW <PersonAddIcon fontSize="small"/></span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_manage_mods}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_manage_mods: e.target.checked})}
+                />
+              </label>
+            </div>
+
+            <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'space-between' }}>
+              <button 
+                type="button" 
+                className={styles.btnUnban} 
+                onClick={() => setModModal({ isOpen: false, userId: null })}
+              >
+                ANULUJ
+              </button>
+              <button 
+                type="button" 
+                className={styles.btnSubmit} 
+                onClick={saveModPermissions}
+              >
+                ZATWIERDŹ ZMIANY
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

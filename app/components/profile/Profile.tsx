@@ -13,6 +13,7 @@ import CommentIcon from "@mui/icons-material/Comment";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { authEmitter } from "../services/authEmitter"; // globalny manager autoryzacji
+import { Link } from "react-router";
 
 interface UserProfile {
   id: string;
@@ -301,12 +302,20 @@ export default function Profile() {
                   src={comm.avatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{comm.name}</span>
+
+                <Link
+                  to={`/c/${comm.name}`}
+                  className={styles.textTruncate}
+                  title={comm.name}
+                >
+                  {comm.name}
+                </Link>
+
                 <button
-                  className={styles.button}
+                  className={`${styles.button} ${styles.settings}`}
                   onClick={() => handleLeaveCommunity(comm.name)}
                 >
-                  Opuść społeczność <ArrowBackIcon className={styles.icon} />
+                  Opuść <ArrowBackIcon className={styles.icon} />
                 </button>
               </li>
             ))}
@@ -322,7 +331,9 @@ export default function Profile() {
                   src={comm.avatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{comm.name}</span>
+                <Link to={`/c/${comm.name}`} className={styles.text}>
+                  {comm.name}
+                </Link>
                 <SettingsIcon className={styles.settings} />
               </li>
             ))}
@@ -338,16 +349,27 @@ export default function Profile() {
                   src={post.communityAvatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{post.communityName}</span>
-                <span className={styles.text}>{post.title}</span>
-                <span className={styles.text}>{post.createdAt}</span>
-                <div className={styles.reactions}>
-                  <span className={styles.iconText}>{post.comments}</span>
-                  <CommentIcon className={styles.icon} />
-                </div>
-                <div className={styles.reactions}>
-                  <span className={styles.iconText}>{post.upvotes}</span>
-                  <ArrowUpwardIcon className={styles.icon} />
+                <Link
+                  to={`/c/${post.communityName}`}
+                  className={`${styles.textTruncate} ${styles.communityColumn}`}
+                >
+                  {post.communityName}
+                </Link>
+                <span className={styles.textTruncate} title={post.title}>
+                  {post.title}
+                </span>
+                <span className={styles.date}>
+                  {new Date(post.createdAt).toLocaleDateString()}
+                </span>
+                <div className={styles.reactionsContainer}>
+                  <div className={styles.reactions}>
+                    <span>{post.comments}</span>
+                    <CommentIcon fontSize="small" />
+                  </div>
+                  <div className={styles.reactions}>
+                    <span>{post.upvotes}</span>
+                    <ArrowUpwardIcon fontSize="small" />
+                  </div>
                 </div>
               </li>
             ))}

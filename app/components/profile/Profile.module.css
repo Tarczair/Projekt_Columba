@@ -157,6 +157,15 @@
   font-weight: bold;
 }
 
+.textTruncate {
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
 .options button:hover {
   background-color: var(--color-secondary);
 }
@@ -170,7 +179,6 @@
 .listElement {
   display: flex;
   align-items: center;
-  justify-content: space-evenly;
   padding: 15px 20px;
   border-bottom: 1px solid var(--color-border);
   gap: 15px;
@@ -216,6 +224,14 @@
   gap: 6px;
 }
 
+.reactionsContainer {
+  display: flex;
+  gap: 15px;
+  flex-shrink: 0;
+  width: 120px;
+  justify-content: flex-end;
+}
+
 .reactions {
   display: flex;
   flex-direction: row;
@@ -250,4 +266,10 @@
   letter-spacing: 1px;
   max-width: 600px;
   line-height: 1.4;
+}
+
+.communityColumn {
+  width: 80px;
+  flex-shrink: 0;
+  font-weight: bold;
 }

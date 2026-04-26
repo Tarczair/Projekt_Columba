@@ -83,3 +83,7 @@
 .settings:hover > * {
   color: var(--color-secondary);
 }
+
+.pageWrapper {
+  justify-content: center;
+}

@@ -34,6 +34,7 @@ export interface CommunityData {
   rules: Rule[];
   tags: string[];
   currentUserRole: UserRole | null;
+  isBanned?: boolean;
 }
 
 export function PostArea() {
@@ -66,8 +67,27 @@ export function PostArea() {
 
       setIsPostsLoading(true);
       try {
-        const url = `http://localhost:5000/api/communities/${communityName}?limit=10${cursor ? `&cursor=${cursor}` : ""}`;
-        const response = await fetch(url);
+        const token = localStorage.getItem("token");
+
+        const url = `http://localhost:5000/api/communities/${communityName}?limit=10${
+          cursor ? `&cursor=${cursor}` : ""
+        }`;
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+
+        if (response.status === 403) {
+          const errorData = await response.json();
+          if (errorData.isBanned) {
+            setCommunityData((prev: any) => ({ ...prev, isBanned: true }));
+            return;
+          }
+        }
 
         if (!response.ok) throw new Error("Błąd pobierania danych");
 
@@ -260,6 +280,39 @@ export function PostArea() {
   }, [nextCursor, hasMore, isPostsLoading, loadPosts]);
 
   if (isLoading) return <div className={styles.pageWrapper}>Ładowanie...</div>;
+
+  if (communityData?.isBanned) {
+    return (
+      <div className={styles.pageWrapper}>
+        <div
+          className={styles.centeredMessage}
+          style={{ textAlign: "center", marginTop: "100px" }}
+        >
+          <DeleteForeverIcon sx={{ fontSize: 100, color: "#ff4444" }} />
+          <h1 className={styles.errorTitle} style={{ color: "#ff4444" }}>
+            ZOSTAŁEŚ ZBANOWANY
+          </h1>
+          <p className={styles.text}>
+            Twoje konto zostało zablokowane w społeczności{" "}
+            <strong>{communityName}</strong>. Nie masz dostępu do przeglądania
+            postów ani ustawień.
+          </p>
+          <Link
+            to="/"
+            className={styles.submit}
+            style={{
+              marginTop: "20px",
+              textDecoration: "none",
+              display: "inline-block",
+            }}
+          >
+            Wróć na stronę główną
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !communityData) {
     return (
       <div className={styles.pageWrapper}>
@@ -323,11 +376,13 @@ export function PostArea() {
             <Post
               key={post.id}
               {...post}
+              postId={post.id}
+              communityId={communityData.id}
+              rules={communityData.rules || []}
               tags={post.tags || []}
               createdAt={post.displayDate || post.createdAt}
             />
           ))}
-
           {isPostsLoading && (
             <p className={styles.loadingMore}>Ładowanie postów...</p>
           )}

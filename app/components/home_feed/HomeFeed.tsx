@@ -12,6 +12,7 @@ export default function HomeFeed() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [feedData, setFeedData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
 
   useEffect(() => {
     const updateAuth = () => {
@@ -30,8 +31,9 @@ export default function HomeFeed() {
     const fetchFeed = async () => {
       try {
         const res = await fetch("http://localhost:5000/api/homefeed");
-        const data = await res.json();
-        setFeedData(data);
+        const json = await res.json();
+        setFeedData(json.data || []);
+        setNextCursor(json.nextCursor);
       } catch (err) {
         console.error("Błąd pobierania HomeFeed", err);
       } finally {
@@ -42,6 +44,36 @@ export default function HomeFeed() {
     fetchFeed();
   }, []);
 
+  const handleJoin = async (communityName: string) => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    try {
+      const res = await fetch("http://localhost:5000/api/joincommunity", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: communityName }),
+      });
+
+      if (res.ok) {
+        const user = authEmitter.getUser();
+        if (user) {
+          user.communities = [
+            ...(user.communities || []),
+            { name: communityName },
+          ];
+          localStorage.setItem("user", JSON.stringify(user));
+          setFeedData([...feedData]);
+        }
+      }
+    } catch (err) {
+      console.error("Błąd dołączania:", err);
+    }
+  };
+
   if (isLoading) return <div>Ładowanie społeczności...</div>;
 
   return (
@@ -49,7 +81,7 @@ export default function HomeFeed() {
       <div className={styles.postArea}>
         <h1 className={styles.mainTitle}>Odkrywaj Społeczności</h1>
 
-        {feedData.map((item) => {
+        {feedData?.map((item) => {
           const currentUser = authEmitter.getUser();
 
           const isOwner =
@@ -82,14 +114,23 @@ export default function HomeFeed() {
 
                 <div className={styles.headerRight}>
                   {canJoin && (
-                    <button className={`${styles.button} ${styles.joinButton}`}>
+                    <button
+                      className={`${styles.button} ${styles.joinButton}`}
+                      onClick={() => handleJoin(item.communityName)}
+                    >
                       Dołącz <PersonAddIcon className={styles.buttonIcon} />
                     </button>
                   )}
                 </div>
               </div>
 
-              <Post {...item.post} />
+              <Post
+                {...item.post}
+                postId={item.post.id}
+                communityId={item.communityId}
+                rules={item.communityRules || []}
+                createdAt={new Date(item.post.createdAt).toLocaleDateString()}
+              />
             </div>
           );
         })}

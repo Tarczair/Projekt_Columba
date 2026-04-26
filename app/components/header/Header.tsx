@@ -23,7 +23,12 @@ export function Header() {
   // const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
   // 
   // NOWY KOD (bezpieczny - localStorage sprawdzane tylko po stronie klienta):
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+const [isLoggedIn, setIsLoggedIn] = useState(() => {
+  if (typeof window !== "undefined") {
+    return authEmitter.isAuthenticated();
+  }
+  return false;
+});
 
   useEffect(() => { //to takie "centrum nasłuchowe" 
     // Zamiast ręcznego localStorage.getItem("token"), używamy metody z authEmitter

@@ -172,13 +172,13 @@ export function Post({
         <div className={styles.postContent}>
           <h2 className={styles.tytul}>{title}</h2>
           <p className={styles.textPost}>{text}</p>
-          {image.length == 0 ? (
+          {!image ? (
             <div></div>
           ) : (
             <img className={styles.postImage} src={image} alt="image" />
           )}
           <p className={styles.tags}>
-            {tags.map((tag, i) => (
+            {tags && tags.length > 0 && tags.map((tag, i) => (
               <span key={tag}>
                 #{tag}
                 {i !== tags.length - 1 && " | "}

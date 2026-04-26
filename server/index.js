@@ -71,7 +71,17 @@ app.post("/api/login", async (req, res) => {
     }
 
     const commsQuery = await pool.query(
-      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1",
+      `SELECT c.id, c.name, c.avatar_url as avatar 
+       FROM communities c 
+       JOIN community_members cm ON c.id = cm.community_id 
+       WHERE cm.user_id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM users_banned ub 
+           WHERE ub.community_id = c.id 
+             AND ub.user_id = $1 
+             AND ub.is_active = true 
+             AND (ub.expires_at IS NULL OR ub.expires_at > NOW())
+         )`,
       [user.id],
     );
 
@@ -106,8 +116,21 @@ app.get("/api/communities/:communityId/members", authenticateToken, async (req, 
   try {
     const { communityId } = req.params;
     const members = await pool.query(
-      `SELECT u.id, u.username, u.avatar_url, cm.role, cm.status, 
-              cm.can_delete_posts, cm.can_ban_users, cm.can_manage_mods
+      `SELECT 
+        u.id, 
+        u.username, 
+        u.avatar_url,
+        cm.role,
+        cm.can_delete_posts,
+        cm.can_ban_users,
+        cm.can_manage_mods,
+        EXISTS (
+          SELECT 1 
+          FROM users_banned ub 
+          WHERE ub.user_id = u.id 
+            AND ub.community_id = cm.community_id
+            AND ub.is_active = true
+        ) AS is_banned
        FROM community_members cm
        JOIN users u ON cm.user_id = u.id
        WHERE cm.community_id = $1`,
@@ -249,8 +272,38 @@ app.get("/api/communities-by-id/:communityId", authenticateToken, async (req, re
 app.post("/api/communities/:communityId/ban-user", authenticateToken, async (req, res) => {
   const { communityId } = req.params;
   const { userId } = req.body;
+  const requesterId = req.user.userId;
 
   try {
+    // Sprawdź szczegóły społeczności i członka
+    const communityQuery = await pool.query(
+      "SELECT owner_id FROM communities WHERE id = $1",
+      [communityId]
+    );
+    if (communityQuery.rows.length === 0) {
+      return res.status(404).json({ error: "Społeczność nie istnieje" });
+    }
+    const communityOwnerId = communityQuery.rows[0].owner_id;
+
+    // Sprawdź, czy userId to nie owner społeczności
+    if (userId === communityOwnerId) {
+      return res.status(403).json({ error: "Nie można zbanować właściciela społeczności" });
+    }
+
+    // Sprawdź uprawnienia requestera: owner lub moderator z can_ban_users
+    const memberQuery = await pool.query(
+      "SELECT role, can_ban_users FROM community_members WHERE community_id = $1 AND user_id = $2",
+      [communityId, requesterId]
+    );
+    const isOwner = requesterId === communityOwnerId;
+    const isModeratorWithBanPermission = memberQuery.rows.length > 0 && 
+      memberQuery.rows[0].role === 'moderator' && 
+      memberQuery.rows[0].can_ban_users;
+
+    if (!isOwner && !isModeratorWithBanPermission) {
+      return res.status(403).json({ error: "Brak uprawnień do banowania użytkowników" });
+    }
+
     await pool.query("BEGIN");
 
     // Sprawdź, czy użytkownik jest już zbanowany
@@ -283,7 +336,7 @@ app.post("/api/communities/:communityId/ban-user", authenticateToken, async (req
       await pool.query(
         `INSERT INTO users_banned (user_id, community_id, description, is_active, banned_by_id)
          VALUES ($1, $2, $3, true, $4)`,
-        [userId, communityId, "Zbanowany z panelu admina", req.user.userId]
+        [userId, communityId, "Zbanowany z panelu admina", requesterId]
       );
       await pool.query("COMMIT");
       return res.json({ message: "Użytkownik został zbanowany" });
@@ -291,6 +344,57 @@ app.post("/api/communities/:communityId/ban-user", authenticateToken, async (req
   } catch (err) {
     await pool.query("ROLLBACK");
     console.error("BAN USER ERROR:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// UNBANOWANIE UŻYTKOWNIKA Z PANELU ADMINA
+app.post("/api/communities/:communityId/unban-user", authenticateToken, async (req, res) => {
+  const { communityId } = req.params;
+  const { userId } = req.body;
+  const requesterId = req.user.userId;
+
+  try {
+    // Sprawdź szczegóły społeczności
+    const communityQuery = await pool.query(
+      "SELECT owner_id FROM communities WHERE id = $1",
+      [communityId]
+    );
+    if (communityQuery.rows.length === 0) {
+      return res.status(404).json({ error: "Społeczność nie istnieje" });
+    }
+
+    const communityOwnerId = communityQuery.rows[0].owner_id;
+
+    // Sprawdź uprawnienia requestera: owner lub moderator z can_ban_users
+    const memberQuery = await pool.query(
+      "SELECT role, can_ban_users FROM community_members WHERE community_id = $1 AND user_id = $2",
+      [communityId, requesterId]
+    );
+    const isOwner = requesterId === communityOwnerId;
+    const isModeratorWithBanPermission = memberQuery.rows.length > 0 && 
+      memberQuery.rows[0].role === 'moderator' && 
+      memberQuery.rows[0].can_ban_users;
+
+    if (!isOwner && !isModeratorWithBanPermission) {
+      return res.status(403).json({ error: "Brak uprawnień do odbanowywania użytkowników" });
+    }
+
+    // UNBAN: ustaw is_active = false
+    const updateResult = await pool.query(
+      `UPDATE users_banned 
+       SET is_active = false 
+       WHERE user_id = $1 AND community_id = $2 AND is_active = true`,
+      [userId, communityId]
+    );
+
+    if (updateResult.rowCount === 0) {
+      return res.status(400).json({ error: "Użytkownik nie jest zbanowany lub już odbanowany" });
+    }
+
+    res.json({ message: "Użytkownik został odbanowany" });
+  } catch (err) {
+    console.error("UNBAN USER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -315,7 +419,17 @@ app.get("/api/me", authenticateToken, async (req, res) => {
 
     //Pobieramy społeczności, do których należy
     const commsQuery = await pool.query(
-      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1 AND c.owner_id != $1;",
+      `SELECT c.id, c.name, c.avatar_url as avatar 
+       FROM communities c 
+       JOIN community_members cm ON c.id = cm.community_id 
+       WHERE cm.user_id = $1 AND c.owner_id != $1
+         AND NOT EXISTS (
+           SELECT 1 FROM users_banned ub 
+           WHERE ub.community_id = c.id 
+             AND ub.user_id = $1 
+             AND ub.is_active = true 
+             AND (ub.expires_at IS NULL OR ub.expires_at > NOW())
+         )`,
       [req.user.userId],
     );
 
@@ -861,6 +975,14 @@ app.get("/api/homefeed", async (req, res) => {
       ) p ON true
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = $2
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM users_banned ub
+        WHERE ub.community_id = c.id
+          AND ub.user_id = $2
+          AND ub.is_active = true
+          AND (ub.expires_at IS NULL OR ub.expires_at > NOW())
+      )
       ORDER BY p.created_at DESC 
       LIMIT $1;
     `,

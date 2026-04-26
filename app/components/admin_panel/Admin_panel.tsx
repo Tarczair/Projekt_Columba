@@ -46,6 +46,32 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
   const [tags, setTags] = useState<any[]>([]);
 
   // === 2. POBIERANIE DANYCH ===
+  const fetchMembers = async () => {
+    const token = localStorage.getItem("token");
+    if (!communityId) return;
+
+    try {
+      const memRes = await fetch(`http://localhost:5000/api/communities/${communityId}/members`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const membersData = await memRes.json();
+      setUsers(membersData.map((u: any) => ({
+        id: u.id,
+        name: u.username,
+        avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
+        isMod: u.role === 'moderator',
+        isBanned: u.is_banned,
+        permissions: {
+          can_delete_posts: u.can_delete_posts,
+          can_ban_users: u.can_ban_users,
+          can_manage_mods: u.can_manage_mods
+        }
+      })));
+    } catch (err) {
+      console.error("Błąd pobierania członków:", err);
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem("token");
@@ -62,23 +88,8 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
           setCommunityDesc(details.description || "");
         }
 
-        // Pobieranie członków [cite: 133, 134]
-        const memRes = await fetch(`http://localhost:5000/api/communities/${communityId}/members`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const membersData = await memRes.json();
-        setUsers(membersData.map((u: any) => ({
-          id: u.id,
-          name: u.username,
-          avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
-          isMod: u.role === 'moderator',
-          isBanned: u.status === 'muted',
-          permissions: {
-            can_delete_posts: u.can_delete_posts,
-            can_ban_users: u.can_ban_users,
-            can_manage_mods: u.can_manage_mods
-          }
-        })));
+        // Pobieranie członków
+        await fetchMembers();
 
         // Pobieranie zgłoszeń [cite: 136, 137]
         const repRes = await fetch(`http://localhost:5000/api/communities/${communityId}/reports`, {
@@ -115,8 +126,9 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
     if (!window.confirm(`Czy na pewno chcesz ${action.toLowerCase()} tego użytkownika?`)) return;
 
     try {
-      // Wyślij POST request do backendu na endpoint ban-user
-      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/ban-user`, {
+      // Wyślij POST request do odpowiedniego endpointu: ban-user lub unban-user
+      const endpoint = isCurrentlyBanned ? "unban-user" : "ban-user";
+      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/${endpoint}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -127,12 +139,8 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
 
       // Jeśli request się powiódł (status 200-299)
       if (res.ok) {
-        // Zaktualizuj stan użytkowników: zmień isBanned na przeciwny i usuń rolę moderatora
-        setUsers((prevUsers) =>
-          prevUsers.map((user) =>
-            user.id === id ? { ...user, isMod: false, isBanned: !user.isBanned } : user,
-          ),
-        );
+        // Odśwież dane z backendu
+        await fetchMembers();
         // Wyświetl alert z informacją o sukcesie
         alert(`Użytkownik został ${isCurrentlyBanned ? "odbanowany" : "zbanowany"}!`);
       } else {

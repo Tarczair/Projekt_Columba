@@ -180,6 +180,7 @@ CREATE TABLE IF NOT EXISTS media (
 
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    description TEXT,
     reporter_id UUID REFERENCES users(id) ON DELETE SET NULL,
     post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
     comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
@@ -198,5 +199,6 @@ CREATE TABLE IF NOT EXISTS users_banned (
     description TEXT,
     is_active BOOLEAN DEFAULT true,
     expires_at TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, community_id)
 );

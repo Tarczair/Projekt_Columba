@@ -154,16 +154,74 @@ app.get("/api/communities/:communityId/reports", authenticateToken, async (req, 
   try {
     const { communityId } = req.params;
     const reports = await pool.query(
-      `SELECT r.id, u.username as reporter, p.title as "postTitle", ru.rule_title as rule, r.status
+      `SELECT 
+        r.id, 
+        u.username as reporter, 
+        p.title as "postTitle", 
+        COALESCE(ru.rule_title, r.description) as rule, -- Jeśli brak zasady, weź opis "Inne"
+        r.reported_user_id,
+        r.status
        FROM reports r
        JOIN users u ON r.reporter_id = u.id
        JOIN posts p ON r.post_id = p.id
-       JOIN rules ru ON r.rule_id = ru.id
+       LEFT JOIN rules ru ON r.rule_id = ru.id -- Zmienione na LEFT JOIN, żeby nie ignorować NULLi
        WHERE r.community_id = $1 AND r.status = 'pending'`,
       [communityId]
     );
     res.json(reports.rows);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// USUNIĘCIE (IGNOROWANIE) ZGŁOSZENIA
+app.delete("/api/reports/:reportId", authenticateToken, async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    // Zmieniamy status na 'resolved', żeby nie wisiał w panelu
+    await pool.query("UPDATE reports SET status = 'resolved' WHERE id = $1", [reportId]);
+    res.json({ message: "Zgłoszenie usunięte" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// BANOWANIE Z POZIOMU ZGŁOSZENIA
+app.post("/api/communities/:communityId/ban-reported", authenticateToken, async (req, res) => {
+  const { communityId } = req.params;
+  const { userId, reportId } = req.body;
+
+  try {
+    await pool.query("BEGIN");
+
+    // 1. Ban (reaktywuje jeśli już był)
+    await pool.query(
+      `INSERT INTO users_banned (user_id, community_id, description, is_active)
+       VALUES ($1, $2, $3, true)
+       ON CONFLICT (user_id, community_id)
+       DO UPDATE SET 
+         is_active = true,
+         description = EXCLUDED.description,
+         expires_at = NULL`,
+      [userId, communityId, "Zbanowany z panelu zgłoszeń"]
+    );
+
+    // 2. Zamknij WSZYSTKIE zgłoszenia na tego usera w tej community
+    await pool.query(
+      `UPDATE reports
+       SET status = 'resolved'
+       WHERE community_id = $1
+         AND reported_user_id = $2
+         AND status = 'pending'`,
+      [communityId, userId]
+    );
+
+    await pool.query("COMMIT");
+
+    res.json({ message: "Użytkownik zbanowany, wszystkie zgłoszenia zamknięte" });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("BAN REPORTED ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -183,6 +241,56 @@ app.get("/api/communities-by-id/:communityId", authenticateToken, async (req, re
 
     res.json(result.rows[0]);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// BANOWANIE UŻYTKOWNIKA Z PANELU ADMINA
+app.post("/api/communities/:communityId/ban-user", authenticateToken, async (req, res) => {
+  const { communityId } = req.params;
+  const { userId } = req.body;
+
+  try {
+    await pool.query("BEGIN");
+
+    // Sprawdź, czy użytkownik jest już zbanowany
+    const existingBan = await pool.query(
+      "SELECT id, is_active FROM users_banned WHERE user_id = $1 AND community_id = $2",
+      [userId, communityId]
+    );
+
+    if (existingBan.rows.length > 0) {
+      const ban = existingBan.rows[0];
+      if (ban.is_active) {
+        // Jeśli już aktywny ban, to odbanuj (toggle)
+        await pool.query(
+          "UPDATE users_banned SET is_active = false WHERE id = $1",
+          [ban.id]
+        );
+        await pool.query("COMMIT");
+        return res.json({ message: "Użytkownik został odbanowany" });
+      } else {
+        // Jeśli nieaktywny, aktywuj ponownie
+        await pool.query(
+          "UPDATE users_banned SET is_active = true, description = 'Zbanowany z panelu admina' WHERE id = $1",
+          [ban.id]
+        );
+        await pool.query("COMMIT");
+        return res.json({ message: "Użytkownik został ponownie zbanowany" });
+      }
+    } else {
+      // Nowy ban
+      await pool.query(
+        `INSERT INTO users_banned (user_id, community_id, description, is_active, banned_by_id)
+         VALUES ($1, $2, $3, true, $4)`,
+        [userId, communityId, "Zbanowany z panelu admina", req.user.userId]
+      );
+      await pool.query("COMMIT");
+      return res.json({ message: "Użytkownik został zbanowany" });
+    }
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("BAN USER ERROR:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -582,6 +690,16 @@ app.post(
 
       const communityId = communityRes.rows[0].id;
 
+    
+      const banCheck = await client.query(
+        "SELECT 1 FROM users_banned WHERE user_id = $1 AND community_id = $2 AND is_active = true",
+        [userId, communityId]
+      );
+      if (banCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(403).json({ error: "Nie możesz postować – masz bana." });
+      }
+
       const baseSlug = slugify(title, { lower: true, strict: true });
       const uniqueSlug = `${baseSlug}-${Date.now()}`;
 
@@ -878,7 +996,8 @@ app.post("/api/posts/:postId/vote", authenticateToken, async (req, res) => {
 });
 
 app.post("/api/reports", authenticateToken, async (req, res) => {
-  const { post_id, rule_id, community_id } = req.body;
+  // 1. Dodajemy 'description' do wyciąganych danych z body
+  const { post_id, rule_id, community_id, description } = req.body;
   const reporter_id = req.user.userId;
 
   try {
@@ -893,10 +1012,19 @@ app.post("/api/reports", authenticateToken, async (req, res) => {
 
     const reported_user_id = postRes.rows[0].user_id;
 
+    // 2. Aktualizujemy zapytanie INSERT o kolumnę 'description' ($6)
+    // Używamy || null, żeby mieć pewność, że jeśli pole jest puste, do bazy trafi NULL
     await pool.query(
-      `INSERT INTO reports (reporter_id, post_id, reported_user_id, rule_id, community_id, status) 
-       VALUES ($1, $2, $3, $4, $5, 'pending')`,
-      [reporter_id, post_id, reported_user_id, rule_id, community_id],
+      `INSERT INTO reports (reporter_id, post_id, reported_user_id, rule_id, community_id, description, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+      [
+        reporter_id, 
+        post_id, 
+        reported_user_id, 
+        rule_id || null,      // Ważne: null jeśli wybrano "Inne"
+        community_id, 
+        description || null   // Ważne: tekst zgłoszenia
+      ],
     );
 
     res.status(201).json({ message: "Zgłoszenie zostało wysłane" });
@@ -933,6 +1061,17 @@ app.get("/api/communities/:name", async (req, res) => {
     if (communityRes.rows.length === 0)
       return res.status(404).json({ error: "Brak społeczności" });
     const community = communityRes.rows[0];
+
+    // --- DODAJ TO: Blokada dla zbanowanych ---
+    if (userId) {
+      const banCheck = await pool.query(
+        "SELECT 1 FROM users_banned WHERE user_id = $1 AND community_id = $2 AND is_active = true",
+        [userId, community.id]
+      );
+      if (banCheck.rows.length > 0) {
+        return res.status(403).json({ error: "Jesteś zbanowany w tej społeczności.", isBanned: true });
+      }
+    }
 
     let postsQuery = `
       SELECT 

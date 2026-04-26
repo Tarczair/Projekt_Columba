@@ -46,8 +46,11 @@ export function Post({
   const [showComments, setShowComments] = useState(false);
   const [currentUpvotes, setCurrentUpvotes] = useState(upvotes);
   const [userVote, setUserVote] = useState(userVoteValue);
+  
+  // === NOWE STANY DLA ZGŁOSZEŃ ===
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [selectedRuleId, setSelectedRuleId] = useState<string>("");
+  const [selectedRuleId, setSelectedRuleId] = useState<string | "other">("");
+  const [customReason, setCustomReason] = useState("");
 
   const toggleComments = () => {
     setShowComments(!showComments);
@@ -57,18 +60,13 @@ export function Post({
     const token = localStorage.getItem("token");
     if (!token) return alert("Musisz być zalogowany!");
 
-    // Jeśli klikasz to samo co już jest wybrane -> cofnij głos (0)
-    // W przeciwnym razie ustaw nową wartość (-1 lub 1)
     const newValue = userVote === value ? 0 : value;
-
     const difference = newValue - userVote;
     const newUpvotes = currentUpvotes + difference;
 
-    // Najpierw aktualizujemy lokalnie i EMITUJEMY do innych komponentów
     setCurrentUpvotes(newUpvotes);
     setUserVote(newValue);
 
-    // Rozsyłamy info do wszystkich kopii tego posta na stronie (HomeFeed i PostArea)
     authEmitter.emit("postVoteUpdate", { postId, newValue, newUpvotes });
 
     try {
@@ -83,23 +81,18 @@ export function Post({
           body: JSON.stringify({ value: newValue }),
         },
       );
-
       if (!res.ok) throw new Error();
     } catch (err) {
-      const rollbackValue = userVote;
-      const rollbackUpvotes = currentUpvotes;
-      setCurrentUpvotes(rollbackUpvotes);
-      setUserVote(rollbackValue);
-      authEmitter.emit("postVoteUpdate", {
-        postId,
-        newValue: rollbackValue,
-        newUpvotes: rollbackUpvotes,
-      });
+      setCurrentUpvotes(currentUpvotes);
+      setUserVote(userVote);
+      authEmitter.emit("postVoteUpdate", { postId, newValue: userVote, newUpvotes: currentUpvotes });
     }
   };
 
+  // === POPRAWIONA FUNKCJA WYSYŁANIA ZGŁOSZENIA ===
   const handleSubmitReport = async () => {
     if (!selectedRuleId) return alert("Wybierz powód zgłoszenia!");
+    if (selectedRuleId === "other" && !customReason.trim()) return alert("Opisz powód zgłoszenia!");
 
     const token = localStorage.getItem("token");
     if (!token) return alert("Musisz być zalogowany!");
@@ -113,14 +106,19 @@ export function Post({
         },
         body: JSON.stringify({
           post_id: postId,
-          rule_id: selectedRuleId,
           community_id: communityId,
+          // Jeśli 'other', wysyłamy null do rule_id, bo Postgres czeka na UUID lub null
+          rule_id: selectedRuleId === "other" ? null : selectedRuleId,
+          // Wysyłamy opis tylko jeśli wybrano 'other'
+          description: selectedRuleId === "other" ? customReason : null,
         }),
       });
 
       if (res.ok) {
-        alert("Zgłoszenie wysłane.");
+        alert("Zgłoszenie zostało wysłane.");
         setIsReportModalOpen(false);
+        setSelectedRuleId("");
+        setCustomReason("");
       } else {
         alert("Błąd podczas zgłaszania");
       }
@@ -129,38 +127,22 @@ export function Post({
     }
   };
 
-  const selectedRule = rules?.find(
-    (r: any) =>
-      String(r.id) === String(selectedRuleId) ||
-      r.rule_title === selectedRuleId,
-  );
-
   useEffect(() => {
-    const handleRemoteVote = (data: {
-      postId: string;
-      newValue: number;
-      newUpvotes: number;
-    }) => {
+    const handleRemoteVote = (data: any) => {
       if (data.postId === postId) {
         setUserVote(data.newValue);
         setCurrentUpvotes(data.newUpvotes);
       }
     };
-
     authEmitter.subscribe("postVoteUpdate", handleRemoteVote);
     return () => authEmitter.unsubscribe("postVoteUpdate", handleRemoteVote);
   }, [postId]);
-
-  useEffect(() => {
-    setCurrentUpvotes(upvotes);
-    setUserVote(userVoteValue);
-  }, [upvotes, userVoteValue]);
 
   return (
     <div className={styles.post}>
       <div className={styles.header}>
         <div>
-          <img className={styles.avatar} src={avatarPath} alt="avatarPath" />
+          <img className={styles.avatar} src={avatarPath} alt="avatar" />
           <h2 className={styles.text}>{userName}</h2>
           <h3 className={styles.text}>{createdAt}</h3>
         </div>
@@ -168,105 +150,105 @@ export function Post({
           <MoreHorizIcon />
         </button>
       </div>
+
       {!isRemoved ? (
         <div className={styles.postContent}>
           <h2 className={styles.tytul}>{title}</h2>
           <p className={styles.textPost}>{text}</p>
-          {!image ? (
-            <div></div>
-          ) : (
-            <img className={styles.postImage} src={image} alt="image" />
-          )}
+          {image && <img className={styles.postImage} src={image} alt="post" />}
           <p className={styles.tags}>
-            {tags && tags.length > 0 && tags.map((tag, i) => (
-              <span key={tag}>
-                #{tag}
-                {i !== tags.length - 1 && " | "}
-              </span>
+            {tags?.map((tag, i) => (
+              <span key={tag}>#{tag}{i !== tags.length - 1 && " | "}</span>
             ))}
           </p>
         </div>
       ) : (
-        <div className={styles.text}>Post został usunięty</div>
+        <div className={styles.text} style={{padding: '20px'}}>Post został usunięty</div>
       )}
+
       <div className={styles.reactions}>
         <div className={styles.votes}>
-          <button
-            className={`${styles.vote} ${userVote === 1 ? styles.voteActiveUp : ""}`}
-            onClick={() => handleVote(1)}
-          >
+          <button className={`${styles.vote} ${userVote === 1 ? styles.voteActiveUp : ""}`} onClick={() => handleVote(1)}>
             <ArrowUpwardIcon className={styles.icons} />
           </button>
-
           <p className={styles.text}>{currentUpvotes}</p>
-
-          <button
-            className={`${styles.vote} ${userVote === -1 ? styles.voteActiveDown : ""}`}
-            onClick={() => handleVote(-1)}
-          >
+          <button className={`${styles.vote} ${userVote === -1 ? styles.voteActiveDown : ""}`} onClick={() => handleVote(-1)}>
             <ArrowDownwardIcon className={styles.icons} />
           </button>
         </div>
+
         <button className={styles.button} onClick={toggleComments}>
-          {comments}
-          <CommentIcon className={styles.icons} />
+          {comments} <CommentIcon className={styles.icons} />
         </button>
 
-        <button
-          className={styles.button}
-          onClick={() => setIsReportModalOpen(true)}
-        >
-          <OutlinedFlagIcon className={styles.icons} />
-          Zgłoś
+        <button className={styles.button} onClick={() => setIsReportModalOpen(true)}>
+          <OutlinedFlagIcon className={styles.icons} /> Zgłoś
         </button>
       </div>
+
       {showComments && <Comments />}
+
+      {/* === NOWY MODAL ZGŁOSZEŃ (W STYLU ADMIN PANELU) === */}
       {isReportModalOpen && (
-        <div
-          className={styles.modalOverlay}
-          onClick={() => setIsReportModalOpen(false)}
-        >
-          <div
-            className={styles.modalContent}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className={styles.text} style={{ marginBottom: "10px" }}>
-              Zgłoś ten post
-            </h3>
+        <div className={styles.modalOverlay} onClick={() => setIsReportModalOpen(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalHeader}>ZGŁOŚ POST</h2>
+            
+            <div className={styles.permissionList}>
+              <p style={{ color: '#aaa', fontSize: '0.9rem', marginBottom: '15px' }}>
+                Dlaczego zgłaszasz ten materiał?
+              </p>
 
-            <select
-              className={styles.reportSelect}
-              value={selectedRuleId}
-              onChange={(e) => setSelectedRuleId(e.target.value)}
-            >
-              <option value="" disabled>
-                Wybierz powód...
-              </option>
-              {rules?.map((rule) => (
-                <option key={(rule as any).id} value={(rule as any).id}>
-                  {rule.rule_title}
-                </option>
+              {/* LISTA ZASAD Z BAZY */}
+              {rules?.map((rule: any) => (
+                <label key={rule.id} className={styles.customCheckContainer}>
+                  <span>{rule.rule_title}</span>
+                  <input 
+                    type="radio" 
+                    name="report_reason" 
+                    value={rule.id} 
+                    checked={selectedRuleId === rule.id}
+                    onChange={(e) => setSelectedRuleId(e.target.value)} 
+                  />
+                  <span className={styles.customCheckmark}></span>
+                </label>
               ))}
-            </select>
 
-            {selectedRule && (
-              <div className={styles.ruleDescriptionBox}>
-                <p className={styles.ruleDescriptionText}>
-                  {selectedRule.description ||
-                    "Brak dodatkowego opisu dla tej zasady."}
-                </p>
-              </div>
-            )}
+              {/* KATEGORIA INNE - ZAWSZE NA DOLE */}
+              <label className={styles.customCheckContainer}>
+                <span>INNE / WŁASNY POWÓD</span>
+                <input 
+                  type="radio" 
+                  name="report_reason" 
+                  value="other" 
+                  checked={selectedRuleId === "other"}
+                  onChange={(e) => setSelectedRuleId(e.target.value)} 
+                />
+                <span className={styles.customCheckmark}></span>
+              </label>
+
+              {/* POLE TEKSTOWE DLA KATEGORII INNE */}
+              {selectedRuleId === "other" && (
+                <textarea 
+                  className={styles.reportTextarea} 
+                  placeholder="Opisz przewinienie..." 
+                  value={customReason}
+                  onChange={(e) => setCustomReason(e.target.value)}
+                  autoFocus
+                />
+              )}
+            </div>
 
             <div className={styles.modalActions}>
-              <button
-                className={styles.cancelBtn}
-                onClick={() => setIsReportModalOpen(false)}
-              >
-                Anuluj
+              <button className={styles.modalBtnCancel} onClick={() => setIsReportModalOpen(false)}>
+                ANULUJ
               </button>
-              <button className={styles.submitBtn} onClick={handleSubmitReport}>
-                Wyślij zgłoszenie
+              <button 
+                className={styles.modalBtnConfirm} 
+                onClick={handleSubmitReport}
+                disabled={!selectedRuleId || (selectedRuleId === "other" && !customReason.trim())}
+              >
+                WYŚLIJ
               </button>
             </div>
           </div>

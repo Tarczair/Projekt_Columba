@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import type { FormEvent } from "react";
-import { useParams } from "react-router"; // Zakładając, że używasz react-router
+import { useParams } from "react-router"; 
 import styles from "./Admin_panel.module.css";
 import Search from "../search/Search";
 import GavelIcon from "@mui/icons-material/Gavel";
@@ -11,10 +11,11 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import type { UserRole } from "../post_area/PostArea";
 
 interface Report {
-  id: string; // Zmienione na string (UUID)
+  id: string; 
   reporter: string;
   postTitle: string;
   rule: string;
+  reported_user_id: string;
 }
 
 interface AdminPanelProps {
@@ -22,15 +23,13 @@ interface AdminPanelProps {
 }
 
 export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
-  // === 1. HOOKI I STANY (Zawsze na początku funkcji) ===
-  const { communityId } = useParams(); // Pobieramy ID społeczności z adresu URL
+  // === 1. HOOKI I STANY ===
+  const { communityId } = useParams(); 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Stany dla społeczności
   const [communityName, setCommunityName] = useState("Ładowanie...");
   const [communityDesc, setCommunityDesc] = useState("Ładowanie opisu...");
   
-  // Stany dla okienka (modala) moderatora
   const [modModal, setModModal] = useState<{ isOpen: boolean; userId: string | null }>({
     isOpen: false,
     userId: null,
@@ -42,62 +41,110 @@ export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
     can_manage_mods: false,
   });
 
-  // Stany dla danych z bazy
   const [users, setUsers] = useState<any[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [tags, setTags] = useState<any[]>([]);
 
-  // === 2. POBIERANIE DANYCH Z BACKENDU PRZY STARTU ===
-useEffect(() => {
-  const fetchData = async () => {
-    const token = localStorage.getItem("token");
-    if (!communityId) return;
+  // === 2. POBIERANIE DANYCH ===
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+      if (!communityId) return;
 
-    try {
-      // --- NOWA SEKCJA: Pobieranie nazwy i opisu ---
-      const detailsRes = await fetch(`http://localhost:5000/api/communities-by-id/${communityId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (detailsRes.ok) {
-        const details = await detailsRes.json();
-        setCommunityName(details.name);
-        setCommunityDesc(details.description || "");
-      }
-
-      // --- Reszta Twoich fetchy (members, reports) pozostaje bez zmian ---
-      const memRes = await fetch(`http://localhost:5000/api/communities/${communityId}/members`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const membersData = await memRes.json();
-      setUsers(membersData.map((u: any) => ({
-        id: u.id,
-        name: u.username,
-        avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
-        isMod: u.role === 'moderator',
-        isBanned: u.status === 'muted',
-        permissions: {
-          can_delete_posts: u.can_delete_posts,
-          can_ban_users: u.can_ban_users,
-          can_manage_mods: u.can_manage_mods
+      try {
+        // Pobieranie szczegółów społeczności [cite: 132, 133]
+        const detailsRes = await fetch(`http://localhost:5000/api/communities-by-id/${communityId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (detailsRes.ok) {
+          const details = await detailsRes.json();
+          setCommunityName(details.name);
+          setCommunityDesc(details.description || "");
         }
-      })));
 
-    } catch (err) {
-      console.error("Błąd podczas ładowania danych panelu:", err);
-    }
-  };
+        // Pobieranie członków [cite: 133, 134]
+        const memRes = await fetch(`http://localhost:5000/api/communities/${communityId}/members`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const membersData = await memRes.json();
+        setUsers(membersData.map((u: any) => ({
+          id: u.id,
+          name: u.username,
+          avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
+          isMod: u.role === 'moderator',
+          isBanned: u.status === 'muted',
+          permissions: {
+            can_delete_posts: u.can_delete_posts,
+            can_ban_users: u.can_ban_users,
+            can_manage_mods: u.can_manage_mods
+          }
+        })));
 
-  fetchData();
-}, [communityId]);
+        // Pobieranie zgłoszeń [cite: 136, 137]
+        const repRes = await fetch(`http://localhost:5000/api/communities/${communityId}/reports`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (repRes.ok) {
+          const reportsData = await repRes.json();
+          setReports(reportsData);
+        }
+
+      } catch (err) {
+        console.error("Błąd podczas ładowania danych panelu:", err);
+      }
+    };
+
+    fetchData();
+  }, [communityId]);
 
   // === 3. FUNKCJE LOGICZNE ===
 
-  const toggleBan = (id: string) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === id ? { ...user, isMod: false, isBanned: !user.isBanned } : user,
-      ),
-    );
+  const toggleBan = async (id: string) => {
+    // Pobierz token autoryzacyjny z localStorage
+    const token = localStorage.getItem("token");
+    // Znajdź użytkownika w liście użytkowników na podstawie ID
+    const user = users.find((u) => u.id === id);
+    // Jeśli użytkownik nie istnieje, zakończ funkcję
+    if (!user) return;
+
+    // Sprawdź, czy użytkownik jest obecnie zbanowany
+    const isCurrentlyBanned = user.isBanned;
+    // Określ akcję na podstawie aktualnego statusu (ban lub unban)
+    const action = isCurrentlyBanned ? "ODBANUJ" : "ZBANUJ";
+    // Wyświetl okno potwierdzenia z odpowiednią akcją
+    if (!window.confirm(`Czy na pewno chcesz ${action.toLowerCase()} tego użytkownika?`)) return;
+
+    try {
+      // Wyślij POST request do backendu na endpoint ban-user
+      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/ban-user`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: id })
+      });
+
+      // Jeśli request się powiódł (status 200-299)
+      if (res.ok) {
+        // Zaktualizuj stan użytkowników: zmień isBanned na przeciwny i usuń rolę moderatora
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user.id === id ? { ...user, isMod: false, isBanned: !user.isBanned } : user,
+          ),
+        );
+        // Wyświetl alert z informacją o sukcesie
+        alert(`Użytkownik został ${isCurrentlyBanned ? "odbanowany" : "zbanowany"}!`);
+      } else {
+        // Jeśli request nie powiódł się, wyświetl alert o błędzie
+        alert("Błąd podczas zmiany statusu użytkownika");
+      }
+    } catch (err) {
+      // W przypadku błędu połączenia, zaloguj błąd do konsoli
+      console.error("Błąd połączenia:", err);
+      // Wyświetl alert o błędzie połączenia
+      alert("Błąd połączenia z serwerem");
+    }
   };
 
   const openModModal = (id: string) => {
@@ -141,6 +188,44 @@ useEffect(() => {
     setUsers((prevUsers) =>
       prevUsers.map((user) => user.id === id ? { ...user, isMod: false } : user)
     );
+  };
+
+  // USUNIĘCIE (ZIGNOROWANIE) ZGŁOSZENIA [cite: 147, 148, 149]
+  const handleDeleteReport = async (reportId: string) => {
+    const token = localStorage.getItem("token");
+    if (!window.confirm("Czy na pewno chcesz zignorować to zgłoszenie?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/reports/${reportId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setReports(prev => prev.filter(r => r.id !== reportId));
+      }
+    } catch (err) {
+      console.error("Błąd usuwania zgłoszenia:", err);
+    }
+  };
+
+  // BANOWANIE OSOBY ZGŁOSZONEJ [cite: 151, 152, 153, 154]
+  const handleBanReportedUser = async (reportId: string, reportedUserId: string) => {
+    const token = localStorage.getItem("token");
+    if (!window.confirm("Zbanować winowajcę?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/ban-reported`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: reportedUserId, reportId: reportId })
+      });
+      if (res.ok) {
+        setReports((prev) => prev.filter(r => r.reported_user_id !== reportedUserId));
+        alert("Użytkownik zbanowany!");
+      }
+    } catch (err) {
+      alert("Błąd połączenia");
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -251,8 +336,21 @@ useEffect(() => {
                     <td>{report.rule}</td>
                     <td>
                       <div className={styles.actionsCell}>
-                        <button type="button" className={styles.btnUnban}>USUŃ <DeleteIcon className={styles.icon} /></button>
-                        <button type="button" className={styles.btnUnban}>BAN <GavelIcon className={styles.icon} /></button>
+                        <button 
+                          type="button" 
+                          className={styles.btnUnban} 
+                          onClick={() => handleDeleteReport(report.id)}
+                        >
+                          USUŃ <DeleteIcon className={styles.icon} />
+                        </button>
+
+                        <button 
+                          type="button" 
+                          className={styles.btnUnban} 
+                          onClick={() => handleBanReportedUser(report.id, report.reported_user_id)}
+                        >
+                          BAN <GavelIcon className={styles.icon} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -263,7 +361,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* MODAL UPRAWNIEŃ */}
       {modModal.isOpen && (
         <div className={styles.modalOverlay} onClick={() => setModModal({ isOpen: false, userId: null })}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>

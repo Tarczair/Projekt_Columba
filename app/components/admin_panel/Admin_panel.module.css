@@ -433,3 +433,203 @@ thead {
 .notMod:disabled > .icon {
   color: var(--color-border) !important;
 }
+
+
+
+/* === NOWE STYLOWANIE MODALA === */
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.72);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  background-color: #1a2333;
+  border: 1px solid #2e3b52;
+  border-radius: 16px;
+  padding: 30px;
+  width: 420px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  font-family: "Inter", sans-serif;
+}
+
+.modalHeader {
+  color: #fff;
+  margin-bottom: 28px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+.permissionList {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 32px;
+}
+
+/* === CUSTOM CHECKBOX / RADIO STYLE === */
+
+.customCheckContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  color: #fff;
+  position: relative;
+  padding: 14px 42px 14px 0;
+  font-size: 1rem;
+  font-weight: 500;
+  user-select: none;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.customCheckContainer:hover {
+  color: #0088ff;
+}
+
+.customCheckContainer input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.customCheckmark {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  background-color: #0f172a;
+  border: 2px solid #3c485e;
+  border-radius: 50%;
+  transition: all 0.2s ease-in-out;
+}
+
+.customCheckContainer:hover input ~ .customCheckmark {
+  border-color: #0088ff;
+}
+
+.customCheckContainer input:checked ~ .customCheckmark {
+  background-color: #0088ff;
+  border-color: #0088ff;
+  box-shadow: 0 0 10px rgba(0, 136, 255, 0.55);
+}
+
+.customCheckmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.customCheckContainer input:checked ~ .customCheckmark:after {
+  display: block;
+}
+
+.customCheckContainer .customCheckmark:after {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+}
+
+/* === ACTION BUTTONS === */
+
+.modalActions {
+  display: flex;
+  gap: 14px;
+}
+
+.modalBtnCancel,
+.modalBtnConfirm {
+  flex: 1;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.modalBtnCancel {
+  background-color: rgba(60, 72, 94, 0.3);
+  border: 1px solid #3c485e;
+  color: #b0bac9;
+}
+
+.modalBtnCancel:hover {
+  background-color: #3c485e;
+  border-color: #4a5a75;
+  color: #fff;
+}
+
+.modalBtnConfirm {
+  background-color: #0088ff;
+  border: 1px solid #0088ff;
+  color: #fff;
+}
+
+.modalBtnConfirm:hover {
+  background-color: #0077dd;
+  border-color: #0077dd;
+}
+
+.modalBtnCancel:active,
+.modalBtnConfirm:active {
+  transform: scale(0.97);
+}
+
+/* === TABLE BUTTONS === */
+
+.tableActionBtn {
+  background-color: transparent;
+  border: 1px solid #3c485e;
+  color: #b0bac9;
+  font-family: inherit;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.tableActionBtn:hover {
+  border-color: #ff4444;
+  color: #ff4444;
+}
+
+.loadingMessage {
+  color: #fff;
+  text-align: center;
+  margin-top: 50px;
+  font-size: 1.1rem;
+  font-weight: 500;
+}

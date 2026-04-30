@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import type { FormEvent } from "react";
 import Search from "../search/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
+import type { UserRole } from "../post_area/PostArea";
 
 interface Report {
   id: number;
@@ -12,7 +13,11 @@ interface Report {
   rule: string;
 }
 
-export default function Moderator_panel() {
+interface ModeratorPanelProps {
+  role?: UserRole | null;
+}
+
+export default function Moderator_panel({ role }: ModeratorPanelProps) {
   const [users, setUsers] = useState([
     {
       id: 1,
@@ -269,12 +274,16 @@ export default function Moderator_panel() {
                       <td>{report.rule}</td>
                       <td>
                         <div className={styles.actionsCell}>
-                          <button type="button" className={styles.btnUnban}>
-                            USUŃ <DeleteIcon className={styles.icon} />
-                          </button>
-                          <button type="button" className={styles.btnUnban}>
-                            BAN <GavelIcon className={styles.icon} />
-                          </button>
+                          {role?.can_delete_posts && (
+                            <button type="button" className={styles.btnUnban}>
+                              USUŃ <DeleteIcon className={styles.icon} />
+                            </button>
+                          )}
+                          {role?.can_ban_users && (
+                            <button type="button" className={styles.btnUnban}>
+                              BAN <GavelIcon className={styles.icon} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

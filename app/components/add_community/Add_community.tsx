@@ -4,21 +4,13 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckIcon from "@mui/icons-material/Check";
 import Search from "../search/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
+// Import authEmitter - główny system zarządzania stanem autoryzacji
+import { authEmitter } from "../services/authEmitter";
 
 interface Rule {
   rule_title: string;
   description: string;
 }
-
-const ALL_TAGS = [
-  "Elektronika",
-  "Programowanie",
-  "Lutowanie",
-  "Arduino",
-  "C++",
-  "Vite",
-  "React",
-];
 
 export default function Add_community() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -27,6 +19,22 @@ export default function Add_community() {
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchTags = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/tags");
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableTags(data);
+        }
+      } catch (error) {
+        console.error("Błąd pobierania tagów:", error);
+      }
+    };
+    fetchTags();
+  }, []);
 
   const [rules, setRules] = useState<Rule[]>([
     { rule_title: "", description: "" },
@@ -40,7 +48,7 @@ export default function Add_community() {
     });
   };
 
-  const filteredTags = ALL_TAGS.filter((tag) =>
+  const filteredTags = availableTags.filter((tag) =>
     tag.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
@@ -61,7 +69,9 @@ export default function Add_community() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
+    // Zamiast bezpośrednio czytać z localStorage, używamy authEmitter.getToken()
+    // To gwarantuje, że zawsze pracujemy z aktualnym tokenem
+    const token = authEmitter.getToken();
     if (!token) {
       alert("Musisz być zalogowany!");
       return;
@@ -110,46 +120,32 @@ export default function Add_community() {
     }
   };
 
+  // State dla autoryzacji - zarządzany poprzez authEmitter
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem("token");
+    // 1. Sprawdzamy stan POCZĄTKOWY - czy użytkownik jest już zalogowany
+    // authEmitter.isAuthenticated() zwraca true jeśli token istnieje w localStorage
+    setIsAuthorized(authEmitter.isAuthenticated());
 
-      if (!token) {
-        setIsAuthorized(false);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch("http://localhost:5000/api/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (response.ok) {
-          setIsAuthorized(true);
-        } else {
-          setIsAuthorized(false);
-        }
-      } catch (err) {
-        console.error("Błąd autoryzacji:", err);
-        setIsAuthorized(false);
-      } finally {
-        setLoading(false);
-      }
+    // 2. Definiujemy callback, który będzie wywoływany każdorazowo, gdy zmieni się stan autoryzacji
+    // Otrzymujemy obiekt z danymi: { isLoggedIn: boolean, user?: any }
+    const handleAuthChange = (data: any) => {
+      setIsAuthorized(data.isLoggedIn);
     };
 
-    checkAuth();
-  }, []);
+    // 3. Subskrybujemy się do zdarzenia "authChange" z authEmitter
+    // Teraz każdy raz gdy ktoś się zaloguje/wyloguje, ten callback się wywoła
+    authEmitter.subscribe("authChange", handleAuthChange);
 
-  if (loading) {
-    return (
-      <div className={styles.centeredMessage}>Sprawdzanie uprawnień...</div>
-    );
-  }
+    // 4. Cleanup function - ważne! Odpisujemy się od zdarzenia gdy komponent zostanie unmounted
+    // Zapobiega to memory leakom i błędom "setState on unmounted component"
+    return () => {
+      authEmitter.unsubscribe("authChange", handleAuthChange);
+    };
+  }, []); // Pusta tablica zależności - efekt uruchamia się tylko raz przy mountowaniu
 
+  // Jeśli użytkownik nie jest zalogowany, wyświetlamy komunikat błędu
   if (!isAuthorized) {
     return (
       <main className={styles.addCommunity}>

@@ -52,11 +52,15 @@ app.post("/api/login", async (req, res) => {
     }
 
     const user = userResult.rows[0];
-
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ error: "Nieprawidłowe dane logowania" });
     }
+
+    const commsQuery = await pool.query(
+      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1",
+      [user.id],
+    );
 
     const token = jwt.sign(
       { userId: user.id, username: user.username },
@@ -67,7 +71,14 @@ app.post("/api/login", async (req, res) => {
     res.json({
       message: "Zalogowano pomyślnie!",
       token: token,
-      user: { id: user.id, username: user.username },
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        bio: user.bio,
+        avatar: user.avatar_url,
+        communities: commsQuery.rows,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -106,17 +117,39 @@ app.get("/api/me", authenticateToken, async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    //Pobieramy społeczności, do których należy (uproszczony przykład)
+    //Pobieramy społeczności, do których należy
     const commsQuery = await pool.query(
-      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1",
+      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1 AND c.owner_id != $1;",
+      [req.user.userId],
+    );
+
+    //Pobieramy posty, ktore stworzyl uzytkownik
+    const postsQueryQuery = await pool.query(
+      `SELECT 
+        p.id, 
+        c.name AS "communityName", 
+        p.title, 
+        p.created_at AS "createdAt", 
+        p.comments_count AS "comments", 
+        p.upvotes_count AS "upvotes", 
+        c.avatar_url AS "communityAvatar" 
+      FROM posts p 
+      JOIN communities c ON c.id = p.community_id 
+      WHERE p.user_id = $1`,
+      [req.user.userId],
+    );
+
+    //Pobieramy spolecznosci, ktore stworzyl uzytkownik
+    const createdCommsQuery = await pool.query(
+      "SELECT c.id, c.name, c.avatar_url as avatar FROM communities c JOIN community_members cm ON c.id = cm.community_id WHERE cm.user_id = $1 AND c.owner_id = $1;",
       [req.user.userId],
     );
 
     res.json({
       ...userData,
       communities: commsQuery.rows,
-      posts: [],
-      createdCommunities: [],
+      posts: postsQueryQuery.rows,
+      createdCommunities: createdCommsQuery.rows,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -143,7 +176,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-app.use("/uploads", express.static("uploads"));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.post(
   "/api/update_profile",
@@ -186,38 +219,40 @@ app.post(
   },
 );
 
-app.get("/api/communities/:name", async (req, res) => {
-  try {
-    const { name } = req.params;
+app.delete("/api/communities/:name", authenticateToken, async (req, res) => {
+  const { name } = req.params;
+  const userId = req.user.userId;
 
-    const community = await pool.query(
-      "SELECT * FROM communities WHERE name ILIKE $1",
+  try {
+    const communityRes = await pool.query(
+      "SELECT id, owner_id FROM communities WHERE LOWER(name) = LOWER($1)",
       [name],
     );
 
-    if (community.rows.length === 0)
-      return res.status(404).json({ error: "Brak" });
+    if (communityRes.rows.length === 0)
+      return res.status(404).json({ error: "Brak społeczności" });
 
-    const communityId = community.rows[0].id;
+    if (String(communityRes.rows[0].owner_id) !== String(userId)) {
+      return res.status(403).json({ error: "Nie jesteś właścicielem!" });
+    }
 
-    const rules = await pool.query(
-      "SELECT rule_title, description FROM rules WHERE community_id = $1",
-      [communityId],
-    );
+    await pool.query("DELETE FROM communities WHERE id = $1", [
+      communityRes.rows[0].id,
+    ]);
+    res.json({ message: "Usunięto" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    const tags = await pool.query(
-      "SELECT name FROM tags WHERE community_id = $1",
-      [communityId],
-    );
-
-    res.json({
-      ...community.rows[0],
-      rules: rules.rows,
-      tags: tags.rows.map((t) => t.name),
-    });
+app.get("/api/tags", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT name FROM tags ORDER BY name ASC");
+    const tags = result.rows.map((row) => row.name);
+    res.json(tags);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: "Błąd pobierania tagów z bazy" });
   }
 });
 
@@ -268,13 +303,14 @@ app.post(
       }
 
       if (tags.length > 0) {
-        for (const tag of tags) {
-          const tagName = typeof tag === "string" ? tag : tag.name;
-
+        const tagIdsRes = await client.query(
+          "SELECT id FROM tags WHERE name = ANY($1)",
+          [tags],
+        );
+        for (const row of tagIdsRes.rows) {
           await client.query(
-            `INSERT INTO tags (community_id, name) 
-             VALUES ($1, $2)`,
-            [communityId, tagName],
+            "INSERT INTO community_tags (community_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [communityId, row.id],
           );
         }
       }
@@ -303,47 +339,565 @@ app.post(
 );
 
 app.post(
-  "/api/joincommunity",
+  "/api/leavecommunity",
   authenticateToken,
-  express.text(),
+  express.json(),
   async (req, res) => {
     const client = await pool.connect();
     try {
-      const name = req.body;
+      const { name } = req.body;
       const userId = req.user.userId;
+
+      if (!name) {
+        return res
+          .status(400)
+          .json({ error: "Brak nazwy społeczności w body." });
+      }
 
       await client.query("BEGIN");
 
       const result = await client.query(
-        `SELECT id FROM communities WHERE name = $1`,
+        "SELECT id FROM communities WHERE name = $1",
         [name],
       );
-
-      const communityId = result.rows[0].id;
 
       if (result.rows.length === 0) {
         throw new Error("Społeczność o tej nazwie nie istnieje.");
       }
 
+      const communityId = result.rows[0].id;
+
       await client.query(
-        `INSERT INTO community_members (community_id, user_id) 
-         VALUES ($1, $2)`,
+        "DELETE FROM community_members WHERE community_id=$1 AND user_id=$2",
         [communityId, userId],
       );
 
       await client.query("COMMIT");
 
-      res.status(201).json({
-        message: "Dołączono do społeczności!",
+      res.status(200).json({
+        message: "Opuściłeś społeczność!",
         communityId: communityId,
       });
     } catch (err) {
       await client.query("ROLLBACK");
-      console.error("Błąd dołączenia do społeczności:", err);
+      console.error("Błąd API leavecommunity:", err.message);
 
       res.status(500).json({
         error: err.message,
       });
+    } finally {
+      client.release();
     }
   },
 );
+
+app.post(
+  "/api/joincommunity",
+  authenticateToken,
+  express.json(),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { name } = req.body;
+      const userId = req.user.userId;
+
+      if (!name) {
+        return res.status(400).json({ error: "Brak nazwy społeczności." });
+      }
+
+      await client.query("BEGIN");
+
+      const communityRes = await client.query(
+        `SELECT id, owner_id FROM communities WHERE name = $1`,
+        [name],
+      );
+
+      if (communityRes.rows.length === 0) {
+        throw new Error("Społeczność nie istnieje.");
+      }
+
+      const community = communityRes.rows[0];
+
+      if (String(community.owner_id) === String(userId)) {
+        return res.status(403).json({
+          error: "Właściciel nie może dołączać do swojej społeczności",
+        });
+      }
+
+      const check = await client.query(
+        `SELECT 1 FROM community_members 
+         WHERE community_id = $1 AND user_id = $2`,
+        [community.id, userId],
+      );
+
+      if (check.rows.length > 0) {
+        return res.status(400).json({
+          error: "Już jesteś członkiem tej społeczności",
+        });
+      }
+
+      await client.query(
+        `INSERT INTO community_members (community_id, user_id) 
+         VALUES ($1, $2)`,
+        [community.id, userId],
+      );
+
+      await client.query("COMMIT");
+
+      return res.json({ message: "Dołączono do społeczności!" });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("JOIN error:", err);
+
+      return res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  },
+);
+
+const slugify = require("slugify");
+
+app.post(
+  "/api/addpost",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    const client = await pool.connect();
+
+    try {
+      const { title, post, community_name } = req.body;
+      const userId = req.user.userId;
+
+      if (!title || !post || !community_name) {
+        return res
+          .status(400)
+          .json({ error: "Tytuł, treść i nazwa społeczności są wymagane." });
+      }
+
+      let imageUrl = null;
+      if (req.file) {
+        imageUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+      }
+
+      await client.query("BEGIN");
+
+      const communityRes = await client.query(
+        "SELECT id FROM communities WHERE name = $1",
+        [community_name],
+      );
+
+      if (communityRes.rows.length === 0) {
+        throw new Error("Społeczność nie istnieje.");
+      }
+
+      const communityId = communityRes.rows[0].id;
+
+      const baseSlug = slugify(title, { lower: true, strict: true });
+      const uniqueSlug = `${baseSlug}-${Date.now()}`;
+
+      const postResult = await client.query(
+        `INSERT INTO posts (title, post, main_image_url, slug, user_id, community_id, is_spoiler) 
+   VALUES ($1, $2, $3, $4, $5, $6, $7) 
+   RETURNING id, slug`,
+        [
+          title,
+          post,
+          imageUrl,
+          uniqueSlug,
+          userId,
+          communityId,
+          req.body.is_spoiler === "true",
+        ],
+      );
+
+      const newPostId = postResult.rows[0].id;
+
+      if (req.body.tags) {
+        const parsedTags = JSON.parse(req.body.tags);
+        if (parsedTags.length > 0) {
+          const tagIdsRes = await client.query(
+            "SELECT id FROM tags WHERE name = ANY($1)",
+            [parsedTags],
+          );
+          for (const row of tagIdsRes.rows) {
+            await client.query(
+              "INSERT INTO post_tags (post_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+              [newPostId, row.id],
+            );
+          }
+        }
+      }
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message: "Post został dodany!",
+        postId: postResult.rows[0].id,
+        slug: postResult.rows[0].slug,
+      });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error("Błąd dodawania posta:", err);
+      res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  },
+);
+
+app.get("/api/communities/:name/posts", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+      } catch (err) {
+        console.log("Nieprawidłowy token, traktuję jako gościa");
+      }
+    }
+
+    if (userId) {
+      const banCheck = await pool.query(
+        `SELECT id FROM users_banned 
+         WHERE user_id = $1 
+         AND community_id = (SELECT id FROM communities WHERE name ILIKE $2)
+         AND is_active = true 
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+        [userId, name],
+      );
+
+      if (banCheck.rows.length > 0) {
+        return res.status(403).json({
+          error: "Jesteś zbanowany w tej społeczności.",
+          isBanned: true,
+        });
+      }
+    }
+
+    const posts = await pool.query(
+      `SELECT 
+        p.id, p.title, p.post as text, p.main_image_url as image, 
+        p.created_at, p.slug, p.upvotes_count, p.comments_count,
+        u.username, u.avatar_url as author_avatar
+       FROM posts p
+       JOIN communities c ON p.community_id = c.id
+       LEFT JOIN users u ON p.user_id = u.id
+       WHERE c.name ILIKE $1 AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [name, limit, offset],
+    );
+
+    res.json(posts.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd serwera podczas pobierania postów" });
+  }
+});
+
+app.get("/api/homefeed", async (req, res) => {
+  try {
+    const limit = 10;
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+      } catch (e) {}
+    }
+
+    const result = await pool.query(
+      `
+      SELECT 
+        c.id AS community_id,
+        c.owner_id,
+        c.name AS community_name, 
+        c.avatar_url AS community_avatar,
+        (
+          SELECT json_agg(json_build_object(
+            'id', r.id, 
+            'rule_title', r.rule_title, 
+            'description', r.description
+          ))
+          FROM rules r 
+          WHERE r.community_id = c.id
+        ) AS community_rules,
+        p.id AS post_id, 
+        p.title, 
+        p.post AS text, 
+        p.main_image_url AS image, 
+        p.created_at, 
+        p.upvotes_count,
+        p.comments_count,
+        u.username AS user_name, 
+        u.avatar_url AS author_avatar,
+        COALESCE(v.value, 0) AS user_vote_value
+      FROM communities c
+      JOIN LATERAL (
+          SELECT * FROM posts 
+          WHERE community_id = c.id 
+          AND deleted_at IS NULL
+          ORDER BY created_at DESC 
+          LIMIT 1
+      ) p ON true
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = $2
+      ORDER BY p.created_at DESC 
+      LIMIT $1;
+    `,
+      [limit, userId],
+    );
+
+    const feedData = result.rows.map((row) => ({
+      communityId: row.community_id,
+      owner_id: row.owner_id,
+      communityName: row.community_name,
+      avatar: row.community_avatar || "/img/pepe_placeholder.png",
+      communityRules: row.community_rules || [],
+      post: {
+        id: row.post_id,
+        avatarPath: row.author_avatar || "/img/pepe_placeholder.png",
+        userName: row.user_name || "Anonim",
+        title: row.title,
+        text: row.text,
+        tags: [],
+        image: row.image || "",
+        upvotes: row.upvotes_count || 0,
+        isRemoved: false,
+        createdAt: row.created_at,
+        displayDate: new Date(row.created_at).toLocaleDateString(),
+        comments: row.comments_count || 0,
+        userVoteValue: parseInt(row.user_vote_value),
+      },
+    }));
+
+    res.json({
+      data: feedData,
+      nextCursor: null,
+    });
+  } catch (err) {
+    console.error("Błąd HomeFeed:", err);
+    res.status(500).json({ error: "Błąd ładowania homefeed" });
+  }
+});
+
+app.get("/api/communities/:name/posts", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const userId = req.user?.userId;
+
+    if (userId) {
+      const banCheck = await pool.query(
+        `SELECT id FROM users_banned 
+         WHERE user_id = $1 
+         AND community_id = (SELECT id FROM communities WHERE name ILIKE $2)
+         AND is_active = true 
+         AND (expires_at IS NULL OR expires_at > NOW())`,
+        [userId, name],
+      );
+      if (banCheck.rows.length > 0) {
+        return res
+          .status(403)
+          .json({ error: "Jesteś zbanowany.", isBanned: true });
+      }
+    }
+
+    const posts = await pool.query(
+      `SELECT 
+        p.id, p.title, p.post as text, p.main_image_url as image, 
+        p.created_at, p.slug, u.username, u.avatar_url as author_avatar,
+        p.upvotes_count AS upvotes, 
+        p.comments_count AS comments,
+        COALESCE(v.value, 0) AS "userVoteValue"
+       FROM posts p
+       JOIN communities c ON p.community_id = c.id
+       LEFT JOIN users u ON p.user_id = u.id
+       LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = $4
+       WHERE c.name ILIKE $1 AND p.deleted_at IS NULL
+       ORDER BY p.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [name, limit, offset, userId || null],
+    );
+
+    res.json(posts.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd serwera" });
+  }
+});
+
+app.post("/api/posts/:postId/vote", authenticateToken, async (req, res) => {
+  const { postId } = req.params;
+  const { value } = req.body; // Może być -1, 0, 1
+  const userId = req.user.userId;
+
+  try {
+    await pool.query("BEGIN");
+
+    const oldVoteRes = await pool.query(
+      "SELECT value FROM votes WHERE user_id = $1 AND post_id = $2",
+      [userId, postId],
+    );
+    const oldValue = oldVoteRes.rows.length > 0 ? oldVoteRes.rows[0].value : 0;
+
+    if (value === 0) {
+      await pool.query(
+        "DELETE FROM votes WHERE user_id = $1 AND post_id = $2",
+        [userId, postId],
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO votes (user_id, post_id, value) 
+         VALUES ($1, $2, $3) 
+         ON CONFLICT (user_id, post_id) 
+         DO UPDATE SET value = EXCLUDED.value`,
+        [userId, postId, value],
+      );
+    }
+
+    const diff = value - oldValue;
+
+    if (diff !== 0) {
+      await pool.query(
+        "UPDATE posts SET upvotes_count = COALESCE(upvotes_count, 0) + $1 WHERE id = $2",
+        [diff, postId],
+      );
+    }
+
+    await pool.query("COMMIT");
+    res.status(200).json({ message: "Głos zapisany", currentVote: value });
+  } catch (err) {
+    await pool.query("ROLLBACK");
+    console.error("BŁĄD SQL VOTE:", err.message); // <--- Zobacz to w terminalu!
+    res.status(500).json({ error: "Błąd bazy danych" });
+  }
+});
+
+app.post("/api/reports", authenticateToken, async (req, res) => {
+  const { post_id, rule_id, community_id } = req.body;
+  const reporter_id = req.user.userId;
+
+  try {
+    const postRes = await pool.query(
+      "SELECT user_id FROM posts WHERE id = $1",
+      [post_id],
+    );
+
+    if (postRes.rows.length === 0) {
+      return res.status(404).json({ error: "Post nie istnieje" });
+    }
+
+    const reported_user_id = postRes.rows[0].user_id;
+
+    await pool.query(
+      `INSERT INTO reports (reporter_id, post_id, reported_user_id, rule_id, community_id, status) 
+       VALUES ($1, $2, $3, $4, $5, 'pending')`,
+      [reporter_id, post_id, reported_user_id, rule_id, community_id],
+    );
+
+    res.status(201).json({ message: "Zgłoszenie zostało wysłane" });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Błąd serwera podczas wysyłania zgłoszenia" });
+  }
+});
+
+app.get("/api/communities/:name", async (req, res) => {
+  try {
+    const { name } = req.params;
+    const limit = parseInt(req.query.limit) || 10;
+    const cursor = req.query.cursor;
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader && authHeader.split(" ")[1];
+    let userId = null;
+
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+      } catch (e) {}
+    }
+
+    const communityRes = await pool.query(
+      "SELECT id, name, description, avatar_url, created_at, owner_id FROM communities WHERE name ILIKE $1",
+      [name],
+    );
+
+    if (communityRes.rows.length === 0)
+      return res.status(404).json({ error: "Brak społeczności" });
+    const community = communityRes.rows[0];
+
+    let postsQuery = `
+      SELECT 
+        p.id, p.title, p.post AS text, p.main_image_url AS image, 
+        p.upvotes_count AS upvotes, p.comments_count AS comments,
+        p.is_spoiler, p.created_at,
+        u.username AS "userName", u.avatar_url AS "avatarPath",
+        COALESCE(v.value, 0) AS "userVoteValue"
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = $2
+      WHERE p.community_id = $1
+    `;
+
+    const rulesRes = await pool.query(
+      "SELECT id, rule_title, description FROM rules WHERE community_id = $1",
+      [community.id],
+    );
+
+    const params = [community.id, userId];
+
+    if (cursor) {
+      postsQuery += ` AND p.created_at < $3`;
+      params.push(cursor);
+    }
+
+    postsQuery += ` ORDER BY p.created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
+    const postsRes = await pool.query(postsQuery, params);
+
+    const formattedPosts = postsRes.rows.map((p) => ({
+      ...p,
+      avatarPath: p.avatarPath || "/img/pepe_placeholder.png",
+      createdAt: p.created_at,
+      displayDate: new Date(p.created_at).toLocaleDateString(),
+      tags: [],
+      userVoteValue: parseInt(p.userVoteValue),
+    }));
+
+    const nextCursor =
+      postsRes.rows.length === limit
+        ? postsRes.rows[postsRes.rows.length - 1].created_at
+        : null;
+
+    res.json({
+      ...community,
+      posts: formattedPosts,
+      nextCursor: nextCursor,
+      rules: rulesRes.rows,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd serwera" });
+  }
+});

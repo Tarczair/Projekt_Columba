@@ -13,6 +13,7 @@ import CommentIcon from "@mui/icons-material/Comment";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import { authEmitter } from "../services/authEmitter"; // globalny manager autoryzacji
+import { Link } from "react-router";
 
 interface UserProfile {
   id: string;
@@ -65,6 +66,61 @@ export default function Profile() {
 
     fetchProfile();
   }, []);
+
+  const handleLeaveCommunity = async (communityName: string) => {
+    if (!communityName) return;
+
+    const fetchLeaveCommunity = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          "http://localhost:5000/api/leavecommunity",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ name: communityName }),
+          },
+        );
+
+        if (!response.ok) {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorData = await response.json();
+            throw new Error(errorData.error);
+          } else {
+            throw new Error(`Błąd serwera (status ${response.status})`);
+          }
+        }
+
+        if (response.ok) {
+          setUser((prevUser) => {
+            if (!prevUser) return null;
+            return {
+              ...prevUser,
+              communities: prevUser.communities.filter(
+                (c) => c.name !== communityName,
+              ),
+            };
+          });
+
+          alert("Opuściłeś społeczność!");
+        }
+
+        const data = await response.json();
+      } catch (err: any) {
+        err.message;
+      }
+    };
+
+    await fetchLeaveCommunity();
+  };
 
   const toggleCommunities = () => {
     setShowCommunities(true);
@@ -246,9 +302,20 @@ export default function Profile() {
                   src={comm.avatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{comm.name}</span>
-                <button className={styles.button}>
-                  Opuść społeczność <ArrowBackIcon className={styles.icon} />
+
+                <Link
+                  to={`/c/${comm.name}`}
+                  className={styles.textTruncate}
+                  title={comm.name}
+                >
+                  {comm.name}
+                </Link>
+
+                <button
+                  className={`${styles.button} ${styles.settings}`}
+                  onClick={() => handleLeaveCommunity(comm.name)}
+                >
+                  Opuść <ArrowBackIcon className={styles.icon} />
                 </button>
               </li>
             ))}
@@ -264,7 +331,9 @@ export default function Profile() {
                   src={comm.avatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{comm.name}</span>
+                <Link to={`/c/${comm.name}`} className={styles.text}>
+                  {comm.name}
+                </Link>
                 <SettingsIcon className={styles.settings} />
               </li>
             ))}
@@ -280,16 +349,27 @@ export default function Profile() {
                   src={post.communityAvatar || "/img/pepe_placeholder.png"}
                   alt=""
                 />
-                <span className={styles.text}>{post.communityName}</span>
-                <span className={styles.text}>{post.title}</span>
-                <span className={styles.text}>{post.createdAt}</span>
-                <div className={styles.reactions}>
-                  <span className={styles.iconText}>{post.comments}</span>
-                  <CommentIcon className={styles.icon} />
-                </div>
-                <div className={styles.reactions}>
-                  <span className={styles.iconText}>{post.upvotes}</span>
-                  <ArrowUpwardIcon className={styles.icon} />
+                <Link
+                  to={`/c/${post.communityName}`}
+                  className={`${styles.textTruncate} ${styles.communityColumn}`}
+                >
+                  {post.communityName}
+                </Link>
+                <span className={styles.textTruncate} title={post.title}>
+                  {post.title}
+                </span>
+                <span className={styles.date}>
+                  {new Date(post.createdAt).toLocaleDateString()}
+                </span>
+                <div className={styles.reactionsContainer}>
+                  <div className={styles.reactions}>
+                    <span>{post.comments}</span>
+                    <CommentIcon fontSize="small" />
+                  </div>
+                  <div className={styles.reactions}>
+                    <span>{post.upvotes}</span>
+                    <ArrowUpwardIcon fontSize="small" />
+                  </div>
                 </div>
               </li>
             ))}

@@ -243,6 +243,8 @@ export default function Admin_panel({ role }: AdminPanelProps) {
 
   const selectedTagsCount = tags.filter((t) => t.isSelected).length;
 
+  const [userSearch, setUserSearch] = useState("");
+
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -317,7 +319,10 @@ export default function Admin_panel({ role }: AdminPanelProps) {
               ZMIEŃ TAGI DLA SPOŁECZNOŚCI {selectedTagsCount}/{tags.length}
             </div>
             <div className={styles.searchBar}>
-              <Search />
+              <Search
+                value={userSearch}
+                onChange={(e: any) => setUserSearch(e.target.value)}
+              />
             </div>
             <div className={styles.tagList}>
               {tags.map((tag) => (
@@ -340,7 +345,10 @@ export default function Admin_panel({ role }: AdminPanelProps) {
 
         <div className={styles.usersCol}>
           <div className={styles.banContainer}>
-            <Search />
+            <Search
+              value={userSearch}
+              onChange={(e: any) => setUserSearch(e.target.value)}
+            />
             <ul style={{ listStyle: "none", padding: 0 }}>
               {users.map((user) => (
                 <li key={user.id} className={styles.userRow}>

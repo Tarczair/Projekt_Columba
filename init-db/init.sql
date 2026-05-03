@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
     bio TEXT,
     role_id UUID REFERENCES roles(id) ON DELETE SET NULL,
     is_active BOOLEAN DEFAULT true,
+    search_vector tsvector,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -41,6 +42,7 @@ CREATE TABLE IF NOT EXISTS communities (
     avatar_url TEXT,
     owner_id UUID REFERENCES users(id) ON DELETE CASCADE,
     is_private BOOLEAN DEFAULT false,
+    search_vector tsvector,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,14 +72,12 @@ CREATE TABLE IF NOT EXISTS posts (
     title TEXT,
     post TEXT,
     main_image_url TEXT,
-    slug TEXT UNIQUE,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL,
     community_id UUID REFERENCES communities(id) ON DELETE CASCADE,
-    shared_post_id UUID REFERENCES posts(id) ON DELETE SET NULL,
     upvotes_count INTEGER DEFAULT 0,
     comments_count INTEGER DEFAULT 0,
     search_vector tsvector,
-    is_spoiler BOOLEAN DEFAULT false, -- DODANE: Obsługa spoilera
+    is_spoiler BOOLEAN DEFAULT false,
     updated_at TIMESTAMP,
     deleted_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -168,16 +168,6 @@ CREATE TABLE IF NOT EXISTS media (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-/*nie wiem czy to bedziemy dodawac czy nie zobaczymy jak bedziemy z czasem stac*/
-
-/*CREATE TABLE IF NOT EXISTS notifications (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);*/
-
 CREATE TABLE IF NOT EXISTS reports (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     reporter_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -200,3 +190,47 @@ CREATE TABLE IF NOT EXISTS users_banned (
     expires_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS posts_search_idx ON posts USING GIN (search_vector);
+CREATE INDEX IF NOT EXISTS users_search_idx ON users USING GIN (search_vector);
+CREATE INDEX IF NOT EXISTS communities_search_idx ON communities USING GIN (search_vector);
+
+
+CREATE OR REPLACE FUNCTION posts_fts_func() RETURNS trigger AS $$
+BEGIN
+    NEW.search_vector := setweight(to_tsvector('simple', coalesce(NEW.title,'')), 'A') || 
+                         setweight(to_tsvector('simple', coalesce(NEW.post,'')), 'B');
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_posts_search BEFORE INSERT OR UPDATE ON posts
+FOR EACH ROW EXECUTE FUNCTION posts_fts_func();
+
+CREATE OR REPLACE FUNCTION general_fts_func() RETURNS trigger AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'users' THEN
+        NEW.search_vector := setweight(to_tsvector('simple', coalesce(NEW.username,'')), 'A') || 
+                             setweight(to_tsvector('simple', coalesce(NEW.bio,'')), 'B');
+    ELSIF TG_TABLE_NAME = 'communities' THEN
+        NEW.search_vector := setweight(to_tsvector('simple', coalesce(NEW.name,'')), 'A') || 
+                             setweight(to_tsvector('simple', coalesce(NEW.description,'')), 'B');
+    END IF;
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_search BEFORE INSERT OR UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION general_fts_func();
+
+CREATE TRIGGER trg_comm_search BEFORE INSERT OR UPDATE ON communities
+FOR EACH ROW EXECUTE FUNCTION general_fts_func();
+
+CREATE OR REPLACE FUNCTION check_email_func() RETURNS trigger AS $$
+BEGIN
+    IF NEW.email !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$' THEN
+        RAISE EXCEPTION 'Niepoprawny format email: %', NEW.email;
+    END IF;
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_email BEFORE INSERT OR UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION check_email_func();

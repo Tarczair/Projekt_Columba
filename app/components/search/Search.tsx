@@ -2,15 +2,26 @@ import React, { useState } from "react";
 import styles from "./Search.module.css";
 import SearchIcon from "@mui/icons-material/Search";
 
-export default function Search() {
-  const [searchTerm, setSearchTerm] = useState("");
+interface SearchProps {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  onFocus?: () => void;
+}
 
+export default function Search({
+  value,
+  onChange,
+  placeholder = "Wyszukaj...",
+  onFocus,
+}: SearchProps) {
   return (
     <div className={styles.searchBar}>
       <input
-        placeholder="Wyszukaj..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        onFocus={onFocus}
         className={styles.searchInput}
       />
       <SearchIcon className={styles.searchIcon} />

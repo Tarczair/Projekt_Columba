@@ -8,7 +8,7 @@ import GroupAddIcon from "@mui/icons-material/GroupAdd";
 import ChatIcon from "@mui/icons-material/Chat";
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router";
-import Search from "../search/Search";
+import Search from "../search/GlobalSearch";
 import { authEmitter } from "../services/authEmitter"; //emiter który będzie przekazywać informacje o zmianie stanu logowania.
 
 export function Header() {
@@ -21,11 +21,12 @@ export function Header() {
   // ===== ZMIANA: Inicjalizacja na false zamiast bezpośrednio na localStorage =====
   // STARY KOD (błąd "localStorage is not defined" na serwerze):
   // const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
-  // 
+  //
   // NOWY KOD (bezpieczny - localStorage sprawdzane tylko po stronie klienta):
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  useEffect(() => { //to takie "centrum nasłuchowe" 
+  useEffect(() => {
+    //to takie "centrum nasłuchowe"
     // Zamiast ręcznego localStorage.getItem("token"), używamy metody z authEmitter
     // Ta metoda sprawdza czy token istnieje w localStorage
     if (typeof window !== "undefined") {
@@ -35,19 +36,17 @@ export function Header() {
     const handleAuthChange = () => {
       // Po każdej zmianie autoryzacji (login/logout), sprawdzamy ponownie
       setIsLoggedIn(authEmitter.isAuthenticated());
-      //te podwójne !! to taki trik. Normalnie getItem zwraca albo null albo string, 
-      // za pomocą pierwszego ! zmieniamy typ na przeciwny logiczny jednocześnie zmieniając to na boolean, 
+      //te podwójne !! to taki trik. Normalnie getItem zwraca albo null albo string,
+      // za pomocą pierwszego ! zmieniamy typ na przeciwny logiczny jednocześnie zmieniając to na boolean,
       // następnie znowu odwracamy ale więc mamy wartość z poczatku ale w systemie boolean.
     };
 
-    authEmitter.subscribe("authChange", handleAuthChange); //zasubskrybowanie czyli sprawienie że obserwator wysyła mu zmiane stanu. 
+    authEmitter.subscribe("authChange", handleAuthChange); //zasubskrybowanie czyli sprawienie że obserwator wysyła mu zmiane stanu.
 
     return () => {
-      authEmitter.unsubscribe("authChange", handleAuthChange); //funkcja czyszcząca, zabezpieczenie przed wyciekiem pamięci. 
+      authEmitter.unsubscribe("authChange", handleAuthChange); //funkcja czyszcząca, zabezpieczenie przed wyciekiem pamięci.
     };
   }, []); //pusta tablica na końcu mówi że ma się wykonać tylko raz.
-
-
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -79,25 +78,29 @@ export function Header() {
 
         {isMenuOpen && (
           <div className={styles.menu}>
-            {!isLoggedIn ? (  
-            <Link to="/login" className={styles.menuOption}>
-              REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons} />
-            </Link>
+            {!isLoggedIn ? (
+              <Link to="/login" className={styles.menuOption}>
+                REJESTRACJA/LOGIN <LoginIcon className={styles.menuIcons} />
+              </Link>
             ) : (
-            <>
-            <Link to="/profile" className={styles.menuOption}>
-              PROFIL <PersonIcon className={styles.menuIcons} />
-            </Link>
-            <button className={styles.menuOption} onClick={() => authEmitter.logout()}>
-              WYLOGUJ <LogoutIcon className={styles.menuIcons} />
-            </button>
-            <Link to="/add_community" className={styles.menuOption}>
-              ZAŁÓŻ SPOŁECZNOŚĆ <GroupAddIcon className={styles.menuIcons} />
-            </Link>
-            <button className={styles.menuOption}>
-              TWOJE POSTY <ChatIcon className={styles.menuIcons} />
-            </button>
-            </>
+              <>
+                <Link to="/profile" className={styles.menuOption}>
+                  PROFIL <PersonIcon className={styles.menuIcons} />
+                </Link>
+                <button
+                  className={styles.menuOption}
+                  onClick={() => authEmitter.logout()}
+                >
+                  WYLOGUJ <LogoutIcon className={styles.menuIcons} />
+                </button>
+                <Link to="/add_community" className={styles.menuOption}>
+                  ZAŁÓŻ SPOŁECZNOŚĆ{" "}
+                  <GroupAddIcon className={styles.menuIcons} />
+                </Link>
+                <button className={styles.menuOption}>
+                  TWOJE POSTY <ChatIcon className={styles.menuIcons} />
+                </button>
+              </>
             )}
           </div>
         )}

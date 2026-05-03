@@ -243,7 +243,10 @@ export default function Add_community() {
             <h4 className={styles.sectionLabel}>
               WYBIERZ TAGI ({selectedTags.length}/3)
             </h4>
-            <Search />
+            <Search
+              value={searchTerm}
+              onChange={(e: any) => setSearchTerm(e.target.value)}
+            />
             <div className={styles.tagList}>
               {filteredTags.map((tag) => (
                 <div

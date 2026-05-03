@@ -212,11 +212,16 @@ export default function Moderator_panel({ role }: ModeratorPanelProps) {
     },
   ];
 
+  const [userSearch, setUserSearch] = useState("");
+
   return (
     <main className={styles.container}>
       <div>
         <div className={styles.banContainer}>
-          <Search />
+          <Search
+            value={userSearch}
+            onChange={(e: any) => setUserSearch(e.target.value)}
+          />
           <form onSubmit={handleSubmit} id="my-admin-form">
             <ul style={{ listStyle: "none", padding: 0 }}>
               {users.map((user) => (

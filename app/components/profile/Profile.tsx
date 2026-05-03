@@ -34,6 +34,7 @@ export default function Profile() {
   const [showCommunities, setShowCommunities] = useState(true);
   const [showCreatedCommunities, setShowCreatedCommunities] = useState(false);
   const [showPosts, setShowPosts] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -207,6 +208,23 @@ export default function Profile() {
       </main>
     );
 
+  const filteredCommunities =
+    user.communities?.filter((c) =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    ) || [];
+
+  const filteredCreatedCommunities =
+    user.createdCommunities?.filter((c) =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()),
+    ) || [];
+
+  const filteredPosts =
+    user.posts?.filter(
+      (p) =>
+        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.communityName.toLowerCase().includes(searchTerm.toLowerCase()),
+    ) || [];
+
   return (
     <div className={styles.site}>
       <form className={styles.userinfo} onSubmit={handleSubmit}>
@@ -270,7 +288,11 @@ export default function Profile() {
 
       <div className={styles.listComm}>
         <div className={styles.header}>
-          <Search />
+          <Search
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Wyszukaj w swoich zasobach..."
+          />
           <div className={styles.options}>
             <button
               onClick={toggleCommunities}
@@ -295,7 +317,7 @@ export default function Profile() {
 
         {showCommunities && (
           <ul className={styles.list}>
-            {user.communities?.map((comm, index) => (
+            {filteredCommunities?.map((comm, index) => (
               <li className={styles.listElement} key={comm.id || index}>
                 <img
                   className={styles.smallAvatar}
@@ -324,7 +346,7 @@ export default function Profile() {
 
         {showCreatedCommunities && (
           <ul className={styles.list}>
-            {user.createdCommunities?.map((comm, index) => (
+            {filteredCreatedCommunities?.map((comm, index) => (
               <li className={styles.listElement} key={comm.id || index}>
                 <img
                   className={styles.smallAvatar}
@@ -342,7 +364,7 @@ export default function Profile() {
 
         {showPosts && (
           <ul className={styles.list}>
-            {user.posts?.map((post, index) => (
+            {filteredPosts?.map((post, index) => (
               <li className={styles.listElement} key={post.id || index}>
                 <img
                   className={styles.smallAvatar}

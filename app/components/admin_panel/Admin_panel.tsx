@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { FormEvent } from "react";
+import { useParams } from "react-router"; 
 import styles from "./Admin_panel.module.css";
 import Search from "../search/Search";
 import GavelIcon from "@mui/icons-material/Gavel";
@@ -7,272 +8,275 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import CheckIcon from "@mui/icons-material/Check";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import { authEmitter } from "../services/authEmitter";
 import type { UserRole } from "../post_area/PostArea";
 
 interface Report {
-  id: number;
+  id: string; 
   reporter: string;
   postTitle: string;
   rule: string;
+  reported_user_id: string;
 }
 
 interface AdminPanelProps {
   role?: UserRole | null;
 }
 
-export default function Admin_panel({ role }: AdminPanelProps) {
+export default function Admin_panel({ role: initialRole }: AdminPanelProps) {
+  // === 1. HOOKI I STANY ===
+  const { communityId } = useParams(); 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [communityName, setCommunityName] = useState(
-    "AKTUALNA NAZWA SPOŁECZNOŚCI",
-  );
-  const [communityDesc, setCommunityDesc] = useState(
-    "Aktualny opis społeczności załadowany z bazy...",
-  );
 
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "Bardzo dluga nazwa uzytkownika do testowaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa UŻYTKOWNIK 1",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 2,
-      name: "UŻYTKOWNIK 2",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-    {
-      id: 3,
-      name: "UŻYTKOWNIK 3",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 4,
-      name: "UŻYTKOWNIK 4",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 5,
-      name: "UŻYTKOWNIK 5",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-    {
-      id: 6,
-      name: "UŻYTKOWNIK 6",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-    {
-      id: 7,
-      name: "UŻYTKOWNIK 7",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 8,
-      name: "UŻYTKOWNIK 8",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-    {
-      id: 9,
-      name: "UŻYTKOWNIK 9",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 10,
-      name: "UŻYTKOWNIK 10",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 11,
-      name: "UŻYTKOWNIK 11",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 12,
-      name: "UŻYTKOWNIK 12",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-    {
-      id: 13,
-      name: "UŻYTKOWNIK 13",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: false,
-      isMod: false,
-    },
-    {
-      id: 14,
-      name: "UŻYTKOWNIK 14",
-      avatarPath: "/img/pepe_placeholder.png",
-      isBanned: true,
-      isMod: false,
-    },
-  ]);
+  const [communityName, setCommunityName] = useState("Ładowanie...");
+  const [communityDesc, setCommunityDesc] = useState("Ładowanie opisu...");
+  
+  const [modModal, setModModal] = useState<{ isOpen: boolean; userId: string | null }>({
+    isOpen: false,
+    userId: null,
+  });
 
-  const toggleBan = (id: number) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === id
-          ? { ...user, isMod: false, isBanned: !user.isBanned }
-          : user,
-      ),
-    );
-  };
+  const [tempPermissions, setTempPermissions] = useState({
+    can_delete_posts: false,
+    can_ban_users: false,
+    can_manage_mods: false,
+  });
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const selectedTags = tags.filter((t) => t.isSelected).map((t) => t.name);
+  const [users, setUsers] = useState<any[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [tags, setTags] = useState<any[]>([]);
 
-    console.log("Wysyłam do bazy:", {
-      communityName,
-      communityDesc,
-      selectedTags,
-      users,
-    });
+  // === 2. POBIERANIE DANYCH ===
+  const fetchMembers = async () => {
+    const token = localStorage.getItem("token");
+    if (!communityId) return;
 
     try {
-      alert("Zmiany zostały zapisane!");
-    } catch (error) {
-      console.error("Błąd zapisu:", error);
+      const memRes = await fetch(`http://localhost:5000/api/communities/${communityId}/members`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const membersData = await memRes.json();
+      setUsers(membersData.map((u: any) => ({
+        id: u.id,
+        name: u.username,
+        avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
+        isMod: u.role === 'moderator',
+        isBanned: u.is_banned,
+        permissions: {
+          can_delete_posts: u.can_delete_posts,
+          can_ban_users: u.can_ban_users,
+          can_manage_mods: u.can_manage_mods
+        }
+      })));
+    } catch (err) {
+      console.error("Błąd pobierania członków:", err);
     }
   };
 
-  const reports: Report[] = [
-    {
-      id: 1,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-    {
-      id: 2,
-      reporter: "NAZWA ZGŁASZAJĄCEGO",
-      postTitle: "TYTUŁ ZGŁOSZONEGO POSTA",
-      rule: "ZASADA NR 1",
-    },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem("token");
+      if (!communityId) return;
 
-  const [tags, setTags] = useState([
-    { id: 1, name: "TAG 1", isSelected: true },
-    { id: 2, name: "TAG 2", isSelected: false },
-    { id: 3, name: "TAG 3", isSelected: true },
-    { id: 4, name: "TAG 4", isSelected: true },
-    { id: 5, name: "TAG 5", isSelected: false },
-  ]);
+      try {
+        // Pobieranie szczegółów społeczności [cite: 132, 133]
+        const detailsRes = await fetch(`http://localhost:5000/api/communities-by-id/${communityId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (detailsRes.ok) {
+          const details = await detailsRes.json();
+          setCommunityName(details.name);
+          setCommunityDesc(details.description || "");
+        }
 
-  const selectedTagsCount = tags.filter((t) => t.isSelected).length;
+        // Pobieranie członków
+        await fetchMembers();
 
-  const [userSearch, setUserSearch] = useState("");
+        // Pobieranie zgłoszeń [cite: 136, 137]
+        const repRes = await fetch(`http://localhost:5000/api/communities/${communityId}/reports`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (repRes.ok) {
+          const reportsData = await repRes.json();
+          setReports(reportsData);
+        }
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+      } catch (err) {
+        console.error("Błąd podczas ładowania danych panelu:", err);
+      }
+    };
+
+    fetchData();
+  }, [communityId]);
+
+  // === 3. FUNKCJE LOGICZNE ===
+
+const toggleBan = async (id: string) => {
+  const token = localStorage.getItem("token");
+  const user = users.find((u) => u.id === id);
+  if (!user) return;
+
+  const isCurrentlyBanned = user.isBanned;
+  const action = isCurrentlyBanned ? "ODBANUJ" : "ZBANUJ";
+
+  if (!window.confirm(`Czy na pewno chcesz ${action.toLowerCase()} tego użytkownika?`)) return;
+
+  try {
+    const endpoint = isCurrentlyBanned ? "unban-user" : "ban-user";
+
+    const res = await fetch(
+      `http://localhost:5000/api/communities/${communityId}/${endpoint}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: id }),
+      }
+    );
+
+    if (res.ok) {
+      
+      await fetchMembers();
+
+     
+      authEmitter.emit("membersChanged");
+      authEmitter.emit("bansChanged");
+
+      
+      authEmitter.emit("authChange", {
+        isLoggedIn: authEmitter.isAuthenticated(),
+      });
+
+      alert(
+        `Użytkownik został ${isCurrentlyBanned ? "odbanowany" : "zbanowany"}!`
+      );
+    } else {
+      alert("Błąd podczas zmiany statusu użytkownika");
+    }
+  } catch (err) {
+    console.error("Błąd połączenia:", err);
+    alert("Błąd połączenia z serwerem");
+  }
+};
+
+  const openModModal = (id: string) => {
+    const user = users.find((u) => u.id === id);
+    if (user) {
+      setTempPermissions(user.permissions || {
+        can_delete_posts: false,
+        can_ban_users: false,
+        can_manage_mods: false,
+      });
+      setModModal({ isOpen: true, userId: id });
+    }
   };
+
+  const saveModPermissions = async () => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/members/${modModal.userId}/permissions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          role: 'moderator',
+          ...tempPermissions
+        })
+      });
+
+      if (res.ok) {
+        setUsers(users.map(u => u.id === modModal.userId ? { ...u, isMod: true, permissions: tempPermissions } : u));
+        setModModal({ isOpen: false, userId: null });
+        alert("Uprawnienia zostały zapisane!");
+      }
+    } catch (err) {
+      alert("Błąd połączenia z serwerem");
+    }
+  };
+
+  const removeMod = (id: string) => {
+    setUsers((prevUsers) =>
+      prevUsers.map((user) => user.id === id ? { ...user, isMod: false } : user)
+    );
+  };
+
+  // USUNIĘCIE (ZIGNOROWANIE) ZGŁOSZENIA [cite: 147, 148, 149]
+  const handleDeleteReport = async (reportId: string) => {
+    const token = localStorage.getItem("token");
+    if (!window.confirm("Czy na pewno chcesz zignorować to zgłoszenie?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/reports/${reportId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setReports(prev => prev.filter(r => r.id !== reportId));
+        authEmitter.emit("reportsChanged");
+      }
+    } catch (err) {
+      console.error("Błąd usuwania zgłoszenia:", err);
+    }
+  };
+
+  // BANOWANIE OSOBY ZGŁOSZONEJ [cite: 151, 152, 153, 154]
+  const handleBanReportedUser = async (reportId: string, reportedUserId: string) => {
+    const token = localStorage.getItem("token");
+    if (!window.confirm("Zbanować winowajcę?")) return;
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/communities/${communityId}/ban-reported`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: reportedUserId, reportId: reportId })
+      });
+      if (res.ok) {
+        setReports((prev) =>
+          prev.filter((r) => r.reported_user_id !== reportedUserId)
+        );
+
+        authEmitter.emit("reportsChanged");
+        authEmitter.emit("bansChanged");
+
+
+        authEmitter.emit("membersChanged");
+
+        alert("Użytkownik zbanowany!");
+      }
+    } catch (err) {
+      alert("Błąd połączenia");
+    }
+  };
+
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  const selectedTags = tags.filter((t) => t.isSelected).map((t) => t.name);
+
+  console.log("Wysyłam do bazy:", {
+   communityName,
+   communityDesc,
+   selectedTags,
+   users,
+  });
+  alert("Zmiany zostały zapisane!");
+ };
+
+ const [userSearch, setUserSearch] = useState("");
 
   const toggleTag = (id: number) => {
-    setTags((prev) =>
-      prev.map((tag) =>
-        tag.id === id ? { ...tag, isSelected: !tag.isSelected } : tag,
-      ),
-    );
+    setTags((prev) => prev.map((tag) => tag.id === id ? { ...tag, isSelected: !tag.isSelected } : tag));
   };
 
-  const toggleMod = (id: number) => {
-    setUsers((prevUsers) =>
-      prevUsers.map((user) =>
-        user.id === id ? { ...user, isMod: !user.isMod } : user,
-      ),
-    );
-  };
+  const selectedTagsCount = tags.filter((t) => t.isSelected).length;
 
   return (
     <main className={styles.containerAdmin}>
       <div className={styles.firstSection}>
-        <form
-          onSubmit={handleSubmit}
-          id="community-edit-form"
-          className={styles.editForm}
-        >
+        <form onSubmit={handleSubmit} id="community-edit-form" className={styles.editForm}>
           <div className={styles.communityInfoCol}>
             <div className={styles.inputWrapper}>
               <input
@@ -281,36 +285,20 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                 onChange={(e) => setCommunityName(e.target.value)}
                 className={styles.topicInput}
                 maxLength={300}
-                placeholder="Zmień nazwę społeczności..."
               />
-              <span className={styles.charCounter}>
-                {communityName.length}/300
-              </span>
+              <span className={styles.charCounter}>{communityName.length}/300</span>
             </div>
 
             <textarea
               className={styles.textContent}
               value={communityDesc}
               onChange={(e) => setCommunityDesc(e.target.value)}
-              placeholder="Zmień opis społeczności..."
             />
 
-            <div className={styles.uploadBox} onClick={handleUploadClick}>
-              <input
-                type="file"
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                accept="image/*"
-              />
-              <ArrowForwardIcon
-                className={styles.uploadIcon}
-                style={{ transform: "rotate(-45deg) scale(1.5)" }}
-              />
-              <p>
-                Wybierz ikonę
-                <br />
-                społeczności
-              </p>
+            <div className={styles.uploadBox} onClick={() => fileInputRef.current?.click()}>
+              <input type="file" ref={fileInputRef} style={{ display: "none" }} accept="image/*" />
+              <ArrowForwardIcon className={styles.uploadIcon} style={{ transform: "rotate(-45deg) scale(1.5)" }} />
+              <p>Wybierz ikonę społeczności</p>
             </div>
           </div>
 
@@ -326,17 +314,9 @@ export default function Admin_panel({ role }: AdminPanelProps) {
             </div>
             <div className={styles.tagList}>
               {tags.map((tag) => (
-                <div
-                  key={tag.id}
-                  className={styles.tagItem}
-                  onClick={() => toggleTag(tag.id)}
-                >
+                <div key={tag.id} className={styles.tagItem} onClick={() => toggleTag(tag.id)}>
                   <span>{tag.name}</span>
-                  <div
-                    className={`${styles.checkCircle} ${tag.isSelected ? styles.active : ""}`}
-                  >
-                    <CheckIcon />
-                  </div>
+                  <div className={`${styles.checkCircle} ${tag.isSelected ? styles.active : ""}`}><CheckIcon /></div>
                 </div>
               ))}
             </div>
@@ -352,31 +332,20 @@ export default function Admin_panel({ role }: AdminPanelProps) {
             <ul style={{ listStyle: "none", padding: 0 }}>
               {users.map((user) => (
                 <li key={user.id} className={styles.userRow}>
-                  <img
-                    className={styles.avatar}
-                    src={user.avatarPath}
-                    alt="img"
-                  />
+                  <img className={styles.avatar} src={user.avatarPath} alt="img" />
                   <span className={styles.name}>{user.name}</span>
 
-                  {role?.can_manage_mods && (
-                    <button
-                      type="button"
-                      onClick={() => toggleMod(user.id)}
-                      className={user.isMod ? styles.isMod : styles.notMod}
-                      disabled={user.isBanned}
-                    >
-                      {user.isMod
-                        ? "ODBIERZ MODERATORA"
-                        : "DODAJ JAKO MODERATORA"}
-                      <PersonAddIcon className={styles.icon} />
-                    </button>
-                  )}
                   <button
                     type="button"
-                    onClick={() => toggleBan(user.id)}
-                    className={styles.btnUnban}
+                    onClick={() => user.isMod ? removeMod(user.id) : openModModal(user.id)}
+                    className={user.isMod ? styles.isMod : styles.notMod}
+                    disabled={user.isBanned}
                   >
+                    {user.isMod ? "ODBIERZ MODA" : "DAJ MODA"}
+                    <PersonAddIcon className={styles.icon} />
+                  </button>
+
+                  <button type="button" onClick={() => toggleBan(user.id)} className={styles.btnUnban}>
                     {user.isBanned ? "ODBANUJ" : "BAN"}
                     <GavelIcon className={styles.icon} />
                   </button>
@@ -384,15 +353,8 @@ export default function Admin_panel({ role }: AdminPanelProps) {
               ))}
             </ul>
           </div>
-
           <div className={styles.actionButtons}>
-            <button
-              type="submit"
-              className={styles.btnSubmit}
-              form="community-edit-form"
-            >
-              ZATWIERDŹ ZMIANY
-            </button>
+            <button type="submit" className={styles.btnSubmit} form="community-edit-form">ZATWIERDŹ ZMIANY</button>
           </div>
         </div>
       </div>
@@ -401,40 +363,85 @@ export default function Admin_panel({ role }: AdminPanelProps) {
         <div className={styles.reportedPosts}>
           <div className={styles.tableContainer}>
             <div className={styles.tableHeaderTitle}>ZGŁOSZONE POSTY</div>
-            <form id="reports-form" onSubmit={(e) => e.preventDefault()}>
-              <table className={styles.adminTable}>
-                <thead>
-                  <tr>
-                    <td>NAZWA ZGŁASZAJĄCEGO</td>
-                    <td>TYTUŁ ZGŁOSZONEGO POSTA</td>
-                    <td>ZŁAMANA ZASADA</td>
-                    <td className={styles.action}>AKCJE</td>
+            <table className={styles.adminTable}>
+              <thead>
+                <tr>
+                  <td>NAZWA ZGŁASZAJĄCEGO</td>
+                  <td>TYTUŁ POSTA</td>
+                  <td>ZASADA</td>
+                  <td className={styles.action}>AKCJE</td>
+                </tr>
+              </thead>
+              <tbody>
+                {reports.map((report) => (
+                  <tr key={report.id}>
+                    <td>{report.reporter}</td>
+                    <td>{report.postTitle}</td>
+                    <td>{report.rule}</td>
+                    <td>
+                      <div className={styles.actionsCell}>
+                        <button 
+                          type="button" 
+                          className={styles.btnUnban} 
+                          onClick={() => handleDeleteReport(report.id)}
+                        >
+                          USUŃ <DeleteIcon className={styles.icon} />
+                        </button>
+
+                        <button 
+                          type="button" 
+                          className={styles.btnUnban} 
+                          onClick={() => handleBanReportedUser(report.id, report.reported_user_id)}
+                        >
+                          BAN <GavelIcon className={styles.icon} />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {reports.map((report) => (
-                    <tr key={report.id}>
-                      <td>{report.reporter}</td>
-                      <td>{report.postTitle}</td>
-                      <td>{report.rule}</td>
-                      <td>
-                        <div className={styles.actionsCell}>
-                          <button type="button" className={styles.btnUnban}>
-                            USUŃ <DeleteIcon className={styles.icon} />
-                          </button>
-                          <button type="button" className={styles.btnUnban}>
-                            BAN <GavelIcon className={styles.icon} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </form>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
+
+      {modModal.isOpen && (
+        <div className={styles.modalOverlay} onClick={() => setModModal({ isOpen: false, userId: null })}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ color: 'white', marginBottom: '20px' }}>UPRAWNIENIA MODERATORA</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', color: 'white' }}>
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>USUWANIE POSTÓW</span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_delete_posts}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_delete_posts: e.target.checked})}
+                />
+              </label>
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>BANOWANIE UŻYTKOWNIKÓW</span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_ban_users}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_ban_users: e.target.checked})}
+                />
+              </label>
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>ZARZĄDZANIE MODAMI</span>
+                <input 
+                  type="checkbox" 
+                  checked={tempPermissions.can_manage_mods}
+                  onChange={(e) => setTempPermissions({...tempPermissions, can_manage_mods: e.target.checked})}
+                />
+              </label>
+            </div>
+            <div style={{ marginTop: '30px', display: 'flex', justifyContent: 'space-between' }}>
+              <button type="button" className={styles.btnUnban} onClick={() => setModModal({ isOpen: false, userId: null })}>ANULUJ</button>
+              <button type="button" className={styles.btnSubmit} onClick={saveModPermissions}>ZATWIERDŹ</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

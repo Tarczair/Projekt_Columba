@@ -30,7 +30,9 @@ export default function HomeFeed() {
   useEffect(() => {
     const fetchFeed = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/homefeed");
+        const token = localStorage.getItem("token");
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch("http://localhost:5000/api/homefeed", { headers });
         const json = await res.json();
         setFeedData(json.data || []);
         setNextCursor(json.nextCursor);

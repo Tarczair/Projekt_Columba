@@ -283,3 +283,86 @@
   width: 100%;
   box-sizing: border-box;
 }
+
+
+/* Styl dla textarea w zgłoszeniach */
+.reportTextarea {
+    width: 100%;
+    background-color: #0d1117;
+    border: 1px solid #30363d;
+    color: white;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 15px;
+    min-height: 100px;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.reportTextarea:focus {
+    border-color: #0088ff;
+    outline: none;
+}
+
+/* Modal Overlay i Content (użyj tych samych co w Admin Panel) */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.modalContent {
+    background: #161b22;
+    border: 1px solid #30363d;
+    padding: 30px;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 450px;
+}
+
+.modalHeader {
+    color: white;
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Style przycisków (równe flexy) */
+.modalActions {
+    display: flex;
+    gap: 15px;
+    margin-top: 25px;
+}
+
+.modalBtnCancel, .modalBtnConfirm {
+    flex: 1;
+    padding: 12px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.modalBtnCancel {
+    background: #30363d;
+    color: white;
+}
+
+.modalBtnConfirm {
+    background: #0088ff;
+    color: white;
+}
+
+.modalBtnConfirm:disabled {
+    background: #004488;
+    color: #888;
+    cursor: not-allowed;
+}

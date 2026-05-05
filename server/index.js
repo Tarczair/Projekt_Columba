@@ -989,8 +989,6 @@ app.post(
         return res.status(403).json({ error: "Nie możesz postować – masz bana." });
       }
 
-      const baseSlug = slugify(title, { lower: true, strict: true });
-      const uniqueSlug = `${baseSlug}-${Date.now()}`;
 
       const postResult = await client.query(
         `INSERT INTO posts (title, post, main_image_url, user_id, community_id, is_spoiler) 

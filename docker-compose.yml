@@ -5,9 +5,9 @@ services:
     image: postgres:15-alpine
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: projekt_columba
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -17,10 +17,11 @@ services:
   backend:
     build: ./server
     ports:
-      - "5000:5000"
+      - "${PORT_BACKEND}:${PORT_BACKEND}"
     environment:
-      - DATABASE_URL=postgres://user:password@db:5432/projekt_columba
-      - JWT_SECRET=twoj_sekret_na_pozniej
+      - PORT_BACKEND=${PORT_BACKEND}
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
     depends_on:
       - db
     volumes:
@@ -31,7 +32,7 @@ services:
       context: .
       dockerfile: Dockerfile.dev
     ports:
-      - "5173:5173"
+      - "${PORT_FRONTEND}:${PORT_FRONTEND}"
     depends_on:
       - backend
 

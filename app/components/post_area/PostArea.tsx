@@ -9,7 +9,7 @@ import { Post } from "./posts/Post";
 import { Sidebar } from "./sidebar/Sidebar";
 import { useState, useEffect, useCallback } from "react";
 import CreatePost from "./CreatePost/CreatePost";
-import { Link, useParams, useNavigate } from "react-router"; // Dodany useNavigate
+import { Link, useParams, useNavigate, useSearchParams } from "react-router"; // Dodany useNavigate
 import { authEmitter } from "../services/authEmitter";
 
 export interface Rule {
@@ -61,6 +61,11 @@ export function PostArea() {
 
   const toggleCreatePost = () => setIsCreatingPost(!isCreatingPost);
 
+  // 1. Upewnij się, że highlightPostId jest pobierane bezpośrednio w komponencie
+  const [searchParams] = useSearchParams();
+  const highlightPostId = searchParams.get("highlight");
+
+  // 2. Funkcja loadPosts - zostawiamy ją w useCallback
   const loadPosts = useCallback(
     async (cursor: string | null = null) => {
       if (isPostsLoading || (!hasMore && cursor !== null)) return;
@@ -69,9 +74,17 @@ export function PostArea() {
       try {
         const token = localStorage.getItem("token");
 
-        const url = `http://localhost:5000/api/communities/${communityName}?limit=10${
-          cursor ? `&cursor=${cursor}` : ""
-        }`;
+        // Budujemy URL - używamy aktualnego highlightPostId z zasięgu komponentu
+        let url = `http://localhost:5000/api/communities/${communityName}?limit=10`;
+
+        if (cursor) {
+          url += `&cursor=${cursor}`;
+        } else if (highlightPostId) {
+          // Tylko przy pierwszym ładowaniu dodajemy highlight
+          url += `&highlight=${highlightPostId}`;
+        }
+
+        console.log("Fetching from URL:", url);
 
         const response = await fetch(url, {
           method: "GET",
@@ -81,16 +94,7 @@ export function PostArea() {
           },
         });
 
-        if (response.status === 403) {
-          const errorData = await response.json();
-          if (errorData.isBanned) {
-            setCommunityData((prev: any) => ({ ...prev, isBanned: true }));
-            return;
-          }
-        }
-
         if (!response.ok) throw new Error("Błąd pobierania danych");
-
         const data = await response.json();
 
         if (cursor === null) {
@@ -109,8 +113,23 @@ export function PostArea() {
         setIsLoading(false);
       }
     },
-    [communityName, hasMore, isPostsLoading],
+    [communityName, hasMore, isPostsLoading, highlightPostId], // Te zależności są OK
   );
+
+  // 3. KLUCZOWA POPRAWKA: useEffect bez loadPosts w zależnościach
+  useEffect(() => {
+    if (communityName) {
+      setPosts([]);
+      setNextCursor(null);
+      setHasMore(true);
+
+      // Wywołujemy funkcję, ale NIE dodajemy jej do tablicy [] niżej
+      loadPosts(null);
+
+      setIsMember(authEmitter.isMemberOf(communityName));
+    }
+    // Usuwamy loadPosts stąd, żeby uniknąć pętli
+  }, [communityName, highlightPostId]);
 
   const handleDeleteCommunity = async () => {
     if (
@@ -252,16 +271,6 @@ export function PostArea() {
     authEmitter.subscribe("authChange", updateAuth);
     return () => authEmitter.unsubscribe("authChange", updateAuth);
   }, []);
-
-  useEffect(() => {
-    if (communityName) {
-      setPosts([]);
-      setNextCursor(null);
-      setHasMore(true);
-      loadPosts(null);
-      setIsMember(authEmitter.isMemberOf(communityName));
-    }
-  }, [communityName]);
 
   useEffect(() => {
     const handleScroll = () => {

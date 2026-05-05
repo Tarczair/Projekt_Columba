@@ -252,10 +252,20 @@ const toggleBan = async (id: string) => {
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    alert("Główne ustawienia społeczności zostały zapisane!");
-  };
+const handleSubmit = async (e: FormEvent) => {
+  e.preventDefault();
+  const selectedTags = tags.filter((t) => t.isSelected).map((t) => t.name);
+
+  console.log("Wysyłam do bazy:", {
+   communityName,
+   communityDesc,
+   selectedTags,
+   users,
+  });
+  alert("Zmiany zostały zapisane!");
+ };
+
+ const [userSearch, setUserSearch] = useState("");
 
   const toggleTag = (id: number) => {
     setTags((prev) => prev.map((tag) => tag.id === id ? { ...tag, isSelected: !tag.isSelected } : tag));
@@ -293,8 +303,15 @@ const toggleBan = async (id: string) => {
           </div>
 
           <div className={styles.tagsCol}>
-            <div className={styles.tagsHeader}>TAGI {selectedTagsCount}/{tags.length}</div>
-            <div className={styles.searchBar}><Search /></div>
+            <div className={styles.tagsHeader}>
+              ZMIEŃ TAGI DLA SPOŁECZNOŚCI {selectedTagsCount}/{tags.length}
+            </div>
+            <div className={styles.searchBar}>
+              <Search
+                value={userSearch}
+                onChange={(e: any) => setUserSearch(e.target.value)}
+              />
+            </div>
             <div className={styles.tagList}>
               {tags.map((tag) => (
                 <div key={tag.id} className={styles.tagItem} onClick={() => toggleTag(tag.id)}>
@@ -308,7 +325,10 @@ const toggleBan = async (id: string) => {
 
         <div className={styles.usersCol}>
           <div className={styles.banContainer}>
-            <Search />
+            <Search
+              value={userSearch}
+              onChange={(e: any) => setUserSearch(e.target.value)}
+            />
             <ul style={{ listStyle: "none", padding: 0 }}>
               {users.map((user) => (
                 <li key={user.id} className={styles.userRow}>

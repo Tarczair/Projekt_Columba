@@ -8,6 +8,8 @@ export default [
   //route("communities_settings", "routes/comm_settings.tsx"),
   // Nowa wersja (dynamiczna)
   route("communities_settings/:communityId", "routes/comm_settings.tsx"),
+  route("u/:username", "routes/user_profile.tsx"),
+  //route("communities_settings", "routes/comm_settings.tsx"),
   route("add_community", "routes/add_community.tsx"),
   route("c/:communityName", "routes/post_area.tsx"),
 ] satisfies RouteConfig;

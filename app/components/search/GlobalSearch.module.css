@@ -1,0 +1,69 @@
+.wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 560px;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: var(--color-primary); /* dopasuj do koloru headera */
+  border: 1px solid var(--color-border);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.tabs button.active {
+  border-bottom: 2px solid orange;
+  font-weight: bold;
+}
+
+.resultItem {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.resultItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.link img {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.title {
+  margin: 0;
+  font-weight: bold;
+}
+.sub {
+  font-size: 12px;
+  opacity: 0.7;
+}

@@ -45,7 +45,11 @@ export default function Tag({ onClose, onConfirm, currentTags }: TagProps) {
       <div className={styles.modal}>
         <h3 className={styles.title}>WYBIERZ TAGI DLA POSTA</h3>
 
-        <Search />
+        <Search
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Wyszukaj tag..."
+        />
 
         <div className={styles.tagList}>
           {filteredTags.map((tag) => (

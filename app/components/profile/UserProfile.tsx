@@ -28,7 +28,6 @@ interface PublicUserProfile {
 
 export default function UserProfile() {
   const { username } = useParams();
-  const navigate = useNavigate();
   const [user, setUser] = useState<PublicUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 

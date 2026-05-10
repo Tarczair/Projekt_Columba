@@ -2,9 +2,16 @@ const express = require("express");
 const { Pool } = require("pg");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const http = require("http");
+const { Server } = require("socket.io");
 const cors = require("cors");
 
 const app = express();
+
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: "http://localhost:5174", methods: ["GET", "POST"] },
+});
 
 const JWT_SECRET = process.env.JWT_SECRET || "twoj_bardzo_tajny_klucz_123";
 
@@ -157,35 +164,34 @@ app.post("/api/login", async (req, res) => {
 app.get("/", (req, res) => res.send("Backend działa i słucha!"));
 
 // 1. Pobieranie listy członków danej społeczności (do listy w panelu)
+
 app.get(
   "/api/communities/:communityId/members",
   authenticateToken,
   async (req, res) => {
     try {
       const { communityId } = req.params;
+
       const members = await pool.query(
         `SELECT 
-        u.id, 
-        u.username, 
-        u.avatar_url,
-        cm.role,
-        cm.can_delete_posts,
-        cm.can_ban_users,
-        cm.can_manage_mods,
-        EXISTS (
-          SELECT 1 
-          FROM users_banned ub 
-          WHERE ub.user_id = u.id 
-            AND ub.community_id = cm.community_id
-            AND ub.is_active = true
-        ) AS is_banned
-       FROM community_members cm
-       JOIN users u ON cm.user_id = u.id
-       WHERE cm.community_id = $1`,
+          u.id, 
+          u.username, 
+          u.avatar_url,
+          cm.role,
+          cm.can_delete_posts,
+          cm.can_ban_users,
+          cm.can_manage_mods,
+          COALESCE(ub.is_active, false) AS is_banned
+         FROM users u
+         LEFT JOIN community_members cm ON u.id = cm.user_id AND cm.community_id = $1
+         LEFT JOIN users_banned ub ON u.id = ub.user_id AND ub.community_id = $1 AND ub.is_active = true
+         WHERE cm.community_id = $1 OR ub.is_active = true`,
         [communityId],
       );
+
       res.json(members.rows);
     } catch (err) {
+      console.error(err);
       res.status(500).json({ error: err.message });
     }
   },
@@ -243,17 +249,18 @@ app.get(
       const { communityId } = req.params;
       const reports = await pool.query(
         `SELECT 
-        r.id, 
-        u.username as reporter, 
-        p.title as "postTitle", 
-        COALESCE(ru.rule_title, r.description) as rule, -- Jeśli brak zasady, weź opis "Inne"
-        r.reported_user_id,
-        r.status
-       FROM reports r
-       JOIN users u ON r.reporter_id = u.id
-       JOIN posts p ON r.post_id = p.id
-       LEFT JOIN rules ru ON r.rule_id = ru.id -- Zmienione na LEFT JOIN, żeby nie ignorować NULLi
-       WHERE r.community_id = $1 AND r.status = 'pending'`,
+          r.id, 
+          u.username as reporter, 
+          p.title as "postTitle", 
+          COALESCE(ru.rule_title, r.description) as rule,
+          r.reported_user_id,
+          r.status,
+          r.post_id   -- <--- BRAKOWAŁO TEJ LINIJKI!
+         FROM reports r
+         JOIN users u ON r.reporter_id = u.id
+         JOIN posts p ON r.post_id = p.id
+         LEFT JOIN rules ru ON r.rule_id = ru.id
+         WHERE r.community_id = $1 AND r.status = 'pending'`,
         [communityId],
       );
       res.json(reports.rows);
@@ -262,6 +269,47 @@ app.get(
     }
   },
 );
+
+app.post("/api/reports", authenticateToken, async (req, res) => {
+  // 1. Dodajemy 'description' do wyciąganych danych z body
+  const { post_id, rule_id, community_id, description } = req.body;
+  const reporter_id = req.user.userId;
+
+  try {
+    const postRes = await pool.query(
+      "SELECT user_id FROM posts WHERE id = $1",
+      [post_id],
+    );
+
+    if (postRes.rows.length === 0) {
+      return res.status(404).json({ error: "Post nie istnieje" });
+    }
+
+    const reported_user_id = postRes.rows[0].user_id;
+
+    // 2. Aktualizujemy zapytanie INSERT o kolumnę 'description' ($6)
+    // Używamy || null, żeby mieć pewność, że jeśli pole jest puste, do bazy trafi NULL
+    await pool.query(
+      `INSERT INTO reports (reporter_id, post_id, reported_user_id, rule_id, community_id, description, status) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
+      [
+        reporter_id,
+        post_id,
+        reported_user_id,
+        rule_id || null, // Ważne: null jeśli wybrano "Inne"
+        community_id,
+        description || null, // Ważne: tekst zgłoszenia
+      ],
+    );
+
+    res.status(201).json({ message: "Zgłoszenie zostało wysłane" });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ error: "Błąd serwera podczas wysyłania zgłoszenia" });
+  }
+});
 
 // USUNIĘCIE (IGNOROWANIE) ZGŁOSZENIA
 app.delete("/api/reports/:reportId", authenticateToken, async (req, res) => {
@@ -277,61 +325,16 @@ app.delete("/api/reports/:reportId", authenticateToken, async (req, res) => {
   }
 });
 
-// BANOWANIE Z POZIOMU ZGŁOSZENIA
-app.post(
-  "/api/communities/:communityId/ban-reported",
-  authenticateToken,
-  async (req, res) => {
-    const { communityId } = req.params;
-    const { userId, reportId } = req.body;
-
-    try {
-      await pool.query("BEGIN");
-
-      // 1. Ban (reaktywuje jeśli już był)
-      await pool.query(
-        `INSERT INTO users_banned (user_id, community_id, description, is_active)
-       VALUES ($1, $2, $3, true)
-       ON CONFLICT (user_id, community_id)
-       DO UPDATE SET 
-         is_active = true,
-         description = EXCLUDED.description,
-         expires_at = NULL`,
-        [userId, communityId, "Zbanowany z panelu zgłoszeń"],
-      );
-
-      // 2. Zamknij WSZYSTKIE zgłoszenia na tego usera w tej community
-      await pool.query(
-        `UPDATE reports
-       SET status = 'resolved'
-       WHERE community_id = $1
-         AND reported_user_id = $2
-         AND status = 'pending'`,
-        [communityId, userId],
-      );
-
-      await pool.query("COMMIT");
-
-      res.json({
-        message: "Użytkownik zbanowany, wszystkie zgłoszenia zamknięte",
-      });
-    } catch (err) {
-      await pool.query("ROLLBACK");
-      console.error("BAN REPORTED ERROR:", err);
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-// Pobieranie szczegółów społeczności po ID
 app.get(
   "/api/communities-by-id/:communityId",
   authenticateToken,
   async (req, res) => {
     try {
       const { communityId } = req.params;
+      const userId = req.user.userId;
+
       const result = await pool.query(
-        "SELECT name, description, avatar_url FROM communities WHERE id = $1",
+        "SELECT id, name, description, avatar_url, owner_id FROM communities WHERE id = $1",
         [communityId],
       );
 
@@ -339,16 +342,37 @@ app.get(
         return res.status(404).json({ error: "Nie znaleziono społeczności" });
       }
 
-      res.json(result.rows[0]);
+      const roleRes = await pool.query(
+        `SELECT role, can_delete_posts, can_ban_users, can_manage_mods 
+         FROM community_members 
+         WHERE community_id = $1 AND user_id = $2`,
+        [communityId, userId],
+      );
+
+      const tagsRes = await pool.query(
+        "SELECT t.name FROM tags t JOIN community_tags ct ON t.id = ct.tag_id WHERE ct.community_id = $1",
+        [communityId],
+      );
+
+      const rulesRes = await pool.query(
+        "SELECT id, rule_title, description FROM rules WHERE community_id = $1",
+        [communityId],
+      );
+
+      res.json({
+        ...result.rows[0],
+        tags: tagsRes.rows.map((r) => r.name),
+        rules: rulesRes.rows,
+        currentUserRole: roleRes.rows[0] || null,
+      });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   },
 );
 
-// BANOWANIE UŻYTKOWNIKA Z PANELU ADMINA
 app.post(
-  "/api/communities/:communityId/ban-user",
+  "/api/communities/:communityId/unban",
   authenticateToken,
   async (req, res) => {
     const { communityId } = req.params;
@@ -356,149 +380,44 @@ app.post(
     const requesterId = req.user.userId;
 
     try {
-      // Sprawdź szczegóły społeczności i członka
-      const communityQuery = await pool.query(
-        "SELECT owner_id FROM communities WHERE id = $1",
-        [communityId],
-      );
-      if (communityQuery.rows.length === 0) {
-        return res.status(404).json({ error: "Społeczność nie istnieje" });
-      }
-      const communityOwnerId = communityQuery.rows[0].owner_id;
-
-      // Sprawdź, czy userId to nie owner społeczności
-      if (userId === communityOwnerId) {
-        return res
-          .status(403)
-          .json({ error: "Nie można zbanować właściciela społeczności" });
-      }
-
-      // Sprawdź uprawnienia requestera: owner lub moderator z can_ban_users
-      const memberQuery = await pool.query(
+      const modCheck = await pool.query(
         "SELECT role, can_ban_users FROM community_members WHERE community_id = $1 AND user_id = $2",
         [communityId, requesterId],
       );
-      const isOwner = requesterId === communityOwnerId;
-      const isModeratorWithBanPermission =
-        memberQuery.rows.length > 0 &&
-        memberQuery.rows[0].role === "moderator" &&
-        memberQuery.rows[0].can_ban_users;
 
-      if (!isOwner && !isModeratorWithBanPermission) {
-        return res
-          .status(403)
-          .json({ error: "Brak uprawnień do banowania użytkowników" });
+      const requester = modCheck.rows[0];
+      const isOwner = requester?.role === "owner";
+      const canBan = requester?.can_ban_users === true;
+
+      if (!isOwner && !canBan) {
+        return res.status(403).json({
+          error:
+            "Nie masz uprawnień do odbanowywania użytkowników w tej społeczności",
+        });
       }
 
-      await pool.query("BEGIN");
-
-      // Sprawdź, czy użytkownik jest już zbanowany
-      const existingBan = await pool.query(
-        "SELECT id, is_active FROM users_banned WHERE user_id = $1 AND community_id = $2",
-        [userId, communityId],
-      );
-
-      if (existingBan.rows.length > 0) {
-        const ban = existingBan.rows[0];
-        if (ban.is_active) {
-          // Jeśli już aktywny ban, to odbanuj (toggle)
-          await pool.query(
-            "UPDATE users_banned SET is_active = false WHERE id = $1",
-            [ban.id],
-          );
-          await pool.query("COMMIT");
-          return res.json({ message: "Użytkownik został odbanowany" });
-        } else {
-          // Jeśli nieaktywny, aktywuj ponownie
-          await pool.query(
-            "UPDATE users_banned SET is_active = true, description = 'Zbanowany z panelu admina' WHERE id = $1",
-            [ban.id],
-          );
-          await pool.query("COMMIT");
-          return res.json({ message: "Użytkownik został ponownie zbanowany" });
-        }
-      } else {
-        // Nowy ban
-        await pool.query(
-          `INSERT INTO users_banned (user_id, community_id, description, is_active, banned_by_id)
-         VALUES ($1, $2, $3, true, $4)`,
-          [userId, communityId, "Zbanowany z panelu admina", requesterId],
-        );
-        await pool.query("COMMIT");
-        return res.json({ message: "Użytkownik został zbanowany" });
-      }
-    } catch (err) {
-      await pool.query("ROLLBACK");
-      console.error("BAN USER ERROR:", err);
-      res.status(500).json({ error: err.message });
-    }
-  },
-);
-
-// UNBANOWANIE UŻYTKOWNIKA Z PANELU ADMINA
-app.post(
-  "/api/communities/:communityId/unban-user",
-  authenticateToken,
-  async (req, res) => {
-    const { communityId } = req.params;
-    const { userId } = req.body;
-    const requesterId = req.user.userId;
-
-    try {
-      // Sprawdź szczegóły społeczności
-      const communityQuery = await pool.query(
-        "SELECT owner_id FROM communities WHERE id = $1",
-        [communityId],
-      );
-      if (communityQuery.rows.length === 0) {
-        return res.status(404).json({ error: "Społeczność nie istnieje" });
-      }
-
-      const communityOwnerId = communityQuery.rows[0].owner_id;
-
-      // Sprawdź uprawnienia requestera: owner lub moderator z can_ban_users
-      const memberQuery = await pool.query(
-        "SELECT role, can_ban_users FROM community_members WHERE community_id = $1 AND user_id = $2",
-        [communityId, requesterId],
-      );
-      const isOwner = requesterId === communityOwnerId;
-      const isModeratorWithBanPermission =
-        memberQuery.rows.length > 0 &&
-        memberQuery.rows[0].role === "moderator" &&
-        memberQuery.rows[0].can_ban_users;
-
-      if (!isOwner && !isModeratorWithBanPermission) {
-        return res
-          .status(403)
-          .json({ error: "Brak uprawnień do odbanowywania użytkowników" });
-      }
-
-      // UNBAN: ustaw is_active = false
       const updateResult = await pool.query(
         `UPDATE users_banned 
-       SET is_active = false 
-       WHERE user_id = $1 AND community_id = $2 AND is_active = true`,
+         SET is_active = false 
+         WHERE user_id = $1 AND community_id = $2 AND is_active = true`,
         [userId, communityId],
       );
 
       if (updateResult.rowCount === 0) {
-        return res
-          .status(400)
-          .json({ error: "Użytkownik nie jest zbanowany lub już odbanowany" });
+        return res.status(400).json({
+          error: "Użytkownik nie posiada aktywnego bana w tej społeczności",
+        });
       }
 
-      res.json({ message: "Użytkownik został odbanowany" });
+      res.json({ message: "Użytkownik został pomyślnie odbanowany" });
     } catch (err) {
       console.error("UNBAN USER ERROR:", err);
-      res.status(500).json({ error: err.message });
+      res
+        .status(500)
+        .json({ error: "Wystąpił błąd serwera podczas odbanowywania" });
     }
   },
 );
-
-// app.listen(5000, "0.0.0.0", () => {
-//   console.log("Serwer Node śmiga na porcie 5000");
-// });
-
 app.get("/api/me", authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
@@ -558,6 +477,26 @@ app.get("/api/me", authenticateToken, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+io.on("connection", (socket) => {
+  console.log("Nowe połączenie Socket.IO:", socket.id);
+
+  socket.on("join_personal_room", (userId) => {
+    socket.join(String(userId));
+  });
+
+  socket.on("join_conversation", (conversationId) => {
+    socket.join(String(conversationId));
+  });
+
+  socket.on("send_message", async (data) => {
+    socket.to(String(data.conversation_id)).emit("receive_message", data);
+
+    if (data.receiver_id) {
+      socket.to(String(data.receiver_id)).emit("receive_message", data);
+    }
+  });
 });
 
 app.get("/api/users/:username", authenticateToken, async (req, res) => {
@@ -872,6 +811,197 @@ app.post(
       res.status(500).json({
         error: err.message,
       });
+    }
+  },
+);
+
+app.put(
+  "/api/communities/:communityId",
+  authenticateToken,
+  upload.single("avatar"),
+  async (req, res) => {
+    const { communityId } = req.params;
+    const { name, description, rules: rulesJson } = req.body;
+    const userId = req.user.userId;
+    const client = await pool.connect();
+
+    try {
+      await client.query("BEGIN");
+
+      const checkOwner = await client.query(
+        "SELECT owner_id FROM communities WHERE id = $1",
+        [communityId],
+      );
+      if (
+        checkOwner.rows.length === 0 ||
+        checkOwner.rows[0].owner_id !== userId
+      ) {
+        return res.status(403).json({ error: "Brak uprawnień" });
+      }
+
+      let avatarUrl = null;
+      if (req.file) {
+        avatarUrl = `/uploads/${req.file.filename}`;
+        await client.query(
+          "UPDATE communities SET name = $1, description = $2, avatar_url = $3 WHERE id = $4",
+          [name, description, avatarUrl, communityId],
+        );
+      } else {
+        await client.query(
+          "UPDATE communities SET name = $1, description = $2 WHERE id = $3",
+          [name, description, communityId],
+        );
+      }
+
+      if (rulesJson) {
+        const rules = JSON.parse(rulesJson);
+        await client.query("DELETE FROM rules WHERE community_id = $1", [
+          communityId,
+        ]);
+        for (const rule of rules) {
+          await client.query(
+            "INSERT INTO rules (community_id, rule_title, description) VALUES ($1, $2, $3)",
+            [communityId, rule.rule_title, rule.description],
+          );
+        }
+      }
+
+      if (req.body.tags) {
+        const tagsArray = JSON.parse(req.body.tags);
+        await client.query(
+          "DELETE FROM community_tags WHERE community_id = $1",
+          [communityId],
+        );
+        for (const tagName of tagsArray) {
+          const tagRes = await client.query(
+            "INSERT INTO tags (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name RETURNING id",
+            [tagName],
+          );
+          const tagId = tagRes.rows[0].id;
+          await client.query(
+            "INSERT INTO community_tags (community_id, tag_id) VALUES ($1, $2)",
+            [communityId, tagId],
+          );
+        }
+      }
+
+      await client.query("COMMIT");
+      res.json({ message: "Zaktualizowano pomyślnie", avatar_url: avatarUrl });
+    } catch (err) {
+      await client.query("ROLLBACK");
+      console.error(err);
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
+app.delete("/api/posts/:postId", authenticateToken, async (req, res) => {
+  const { postId } = req.params;
+  const requesterId = req.user.userId;
+
+  try {
+    const permissionCheck = await pool.query(
+      `SELECT cm.can_delete_posts, cm.role, p.user_id as author_id
+       FROM posts p
+       LEFT JOIN community_members cm ON cm.community_id = p.community_id AND cm.user_id = $2
+       WHERE p.id = $1`,
+      [postId, requesterId],
+    );
+
+    if (permissionCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Post nie istnieje" });
+    }
+
+    const { can_delete_posts, role, author_id } = permissionCheck.rows[0];
+
+    const isAuthorized =
+      requesterId === author_id || can_delete_posts || role === "owner";
+
+    if (!isAuthorized) {
+      return res
+        .status(403)
+        .json({ error: "Brak uprawnień do usunięcia posta" });
+    }
+
+    await pool.query("DELETE FROM posts WHERE id = $1", [postId]);
+
+    res.json({ message: "Post został usunięty" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Błąd serwera podczas usuwania posta" });
+  }
+});
+
+app.post(
+  "/api/communities/:communityId/ban",
+  authenticateToken,
+  async (req, res) => {
+    const { communityId } = req.params;
+    const { userId: targetUserId, description } = req.body;
+    const requesterId = req.user.userId;
+
+    try {
+      const modCheck = await pool.query(
+        "SELECT can_ban_users, role FROM community_members WHERE community_id = $1 AND user_id = $2",
+        [communityId, requesterId],
+      );
+
+      if (modCheck.rows.length === 0) {
+        return res.status(403).json({ error: "Brak uprawnień" });
+      }
+
+      const { can_ban_users, role } = modCheck.rows[0];
+      if (!can_ban_users && role !== "owner") {
+        return res
+          .status(403)
+          .json({ error: "Nie masz uprawnień do banowania" });
+      }
+
+      await pool.query("BEGIN");
+
+      const existingBan = await pool.query(
+        "SELECT id FROM users_banned WHERE user_id = $1 AND community_id = $2",
+        [targetUserId, communityId],
+      );
+
+      if (existingBan.rows.length > 0) {
+        await pool.query(
+          "UPDATE users_banned SET is_active = true, description = $1, banned_by_id = $2 WHERE id = $3",
+          [
+            description || "Złamanie regulaminu",
+            requesterId,
+            existingBan.rows[0].id,
+          ],
+        );
+      } else {
+        await pool.query(
+          `INSERT INTO users_banned (user_id, banned_by_id, community_id, description, is_active)
+                 VALUES ($1, $2, $3, $4, true)`,
+          [
+            targetUserId,
+            requesterId,
+            communityId,
+            description || "Złamanie regulaminu",
+          ],
+        );
+      }
+
+      await pool.query(
+        "DELETE FROM community_members WHERE community_id = $1 AND user_id = $2",
+        [communityId, targetUserId],
+      );
+
+      await pool.query(
+        "DELETE FROM reports WHERE community_id = $1 AND reported_user_id = $2",
+        [communityId, targetUserId],
+      );
+
+      await pool.query("COMMIT");
+      res.json({ message: "Użytkownik został zbanowany" });
+    } catch (err) {
+      await pool.query("ROLLBACK");
+      console.error(err);
+      res.status(500).json({ error: "Błąd serwera podczas banowania" });
     }
   },
 );
@@ -1238,46 +1368,34 @@ app.post("/api/posts/:postId/vote", authenticateToken, async (req, res) => {
   }
 });
 
-app.post("/api/reports", authenticateToken, async (req, res) => {
-  // 1. Dodajemy 'description' do wyciąganych danych z body
-  const { post_id, rule_id, community_id, description } = req.body;
-  const reporter_id = req.user.userId;
-
-  try {
-    const postRes = await pool.query(
-      "SELECT user_id FROM posts WHERE id = $1",
-      [post_id],
-    );
-
-    if (postRes.rows.length === 0) {
-      return res.status(404).json({ error: "Post nie istnieje" });
+app.get(
+  "/api/communities/:communityId/reports",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const { communityId } = req.params;
+      const reports = await pool.query(
+        `SELECT 
+        r.id, 
+        u.username as reporter, 
+        r.post_id,
+        p.title as "postTitle", 
+        COALESCE(ru.rule_title, r.description) as rule, 
+        r.reported_user_id,
+        r.status
+       FROM reports r
+       JOIN users u ON r.reporter_id = u.id
+       JOIN posts p ON r.post_id = p.id
+       LEFT JOIN rules ru ON r.rule_id = ru.id 
+       WHERE r.community_id = $1 AND r.status = 'pending'`,
+        [communityId],
+      );
+      res.json(reports.rows);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
-
-    const reported_user_id = postRes.rows[0].user_id;
-
-    // 2. Aktualizujemy zapytanie INSERT o kolumnę 'description' ($6)
-    // Używamy || null, żeby mieć pewność, że jeśli pole jest puste, do bazy trafi NULL
-    await pool.query(
-      `INSERT INTO reports (reporter_id, post_id, reported_user_id, rule_id, community_id, description, status) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'pending')`,
-      [
-        reporter_id,
-        post_id,
-        reported_user_id,
-        rule_id || null, // Ważne: null jeśli wybrano "Inne"
-        community_id,
-        description || null, // Ważne: tekst zgłoszenia
-      ],
-    );
-
-    res.status(201).json({ message: "Zgłoszenie zostało wysłane" });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ error: "Błąd serwera podczas wysyłania zgłoszenia" });
-  }
-});
+  },
+);
 
 app.get("/api/communities/:name", async (req, res) => {
   try {
@@ -1308,6 +1426,27 @@ app.get("/api/communities/:name", async (req, res) => {
     }
     const community = communityRes.rows[0];
 
+    let currentUserRole = null;
+    if (userId) {
+      const roleRes = await pool.query(
+        `SELECT role, can_delete_posts, can_ban_users, can_manage_mods 
+         FROM community_members 
+         WHERE community_id = $1 AND user_id = $2`,
+        [community.id, userId],
+      );
+
+      if (roleRes.rows.length > 0) {
+        currentUserRole = roleRes.rows[0];
+      } else if (community.owner_id === userId) {
+        currentUserRole = {
+          role: "owner",
+          can_delete_posts: true,
+          can_ban_users: true,
+          can_manage_mods: true,
+        };
+      }
+    }
+
     // --- DODAJ TO: Blokada dla zbanowanych ---
     if (userId) {
       const banCheck = await pool.query(
@@ -1324,7 +1463,8 @@ app.get("/api/communities/:name", async (req, res) => {
 
     let postsQuery = `
       SELECT p.*, u.username AS "userName", u.avatar_url AS "avatarPath",
-             COALESCE(v.value, 0) AS "userVoteValue"
+             COALESCE(v.value, 0) AS "userVoteValue",
+             (SELECT json_agg(t.name) FROM post_tags pt JOIN tags t ON t.id = pt.tag_id WHERE pt.post_id = p.id) AS tags_array
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN votes v ON v.post_id = p.id AND v.user_id = $2
@@ -1374,8 +1514,12 @@ app.get("/api/communities/:name", async (req, res) => {
       avatarPath: p.avatarPath || "/img/pepe_placeholder.png",
       createdAt: p.created_at,
       displayDate: new Date(p.created_at).toLocaleDateString(),
-      tags: [],
+      tags: p.tags_array || [],
       userVoteValue: parseInt(p.userVoteValue) || 0,
+      upvotes_count: parseInt(p.upvotes_count) || 0,
+      comments_count: parseInt(p.comments_count) || 0,
+      upvotes: parseInt(p.upvotes_count) || 0,
+      comments: parseInt(p.comments_count) || 0,
     }));
 
     const nextCursor =
@@ -1388,6 +1532,7 @@ app.get("/api/communities/:name", async (req, res) => {
       posts: formattedPosts,
       nextCursor: nextCursor,
       rules: rulesRes.rows,
+      currentUserRole: currentUserRole,
     });
   } catch (err) {
     console.error("Błąd w get community:", err);
@@ -1395,10 +1540,148 @@ app.get("/api/communities/:name", async (req, res) => {
   }
 });
 
+app.get("/api/friends", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    const query = `
+      SELECT u.id, u.username, u.avatar_url 
+      FROM users u
+      JOIN friendships f ON (u.id = f.user_id_1 OR u.id = f.user_id_2)
+      WHERE f.status = 'accepted' 
+      AND u.id != $1
+      AND (f.user_id_1 = $1 OR f.user_id_2 = $1)
+    `;
+    const friends = await pool.query(query, [userId]);
+    res.json(friends.rows);
+  } catch (err) {
+    res.status(500).json({ error: "Błąd pobierania znajomych" });
+  }
+});
+
+app.get("/api/friends/invites", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+
+    const result = await pool.query(
+      `SELECT f.id AS friendship_id, u.id, u.username, u.avatar_url 
+       FROM friendships f
+       JOIN users u ON f.user_id_1 = u.id
+       WHERE f.user_id_2 = $1 AND f.status = 'pending'`,
+      [userId],
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/friends/respond", authenticateToken, async (req, res) => {
+  const { friendshipId, action } = req.body;
+  try {
+    if (action === "accept") {
+      await pool.query(
+        "UPDATE friendships SET status = 'accepted' WHERE id = $1",
+        [friendshipId],
+      );
+    } else {
+      await pool.query("DELETE FROM friendships WHERE id = $1", [friendshipId]);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post(
+  "/api/messages/send",
+  authenticateToken,
+  upload.single("file"),
+  async (req, res) => {
+    const { conversationId, content } = req.body;
+    const senderId = req.user.userId || req.user.id;
+
+    try {
+      const msgResult = await pool.query(
+        `WITH inserted AS (
+            INSERT INTO messages (sender_id, conversation_id, content) 
+            VALUES ($1, $2, $3) 
+            RETURNING *
+         )
+         SELECT i.*, u.username as sender_name 
+         FROM inserted i 
+         JOIN users u ON i.sender_id = u.id`,
+        [senderId, conversationId, content],
+      );
+
+      let newMessage = msgResult.rows[0];
+
+      if (req.file) {
+        const fileUrl = `http://localhost:5000/uploads/${req.file.filename}`;
+        const mediaResult = await pool.query(
+          "INSERT INTO media (user_id, message_id, url, type) VALUES ($1, $2, $3, $4) RETURNING url, type",
+          [senderId, newMessage.id, fileUrl, req.file.mimetype],
+        );
+        newMessage.media = mediaResult.rows[0];
+      }
+
+      res.json(newMessage);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Błąd podczas wysyłania wiadomości" });
+    }
+  },
+);
+
+app.get(
+  "/api/conversations/friend/:friendId",
+  authenticateToken,
+  async (req, res) => {
+    const userId = req.user.userId || req.user.id;
+    const { friendId } = req.params;
+
+    try {
+      let convRes = await pool.query(
+        `SELECT conversation_id FROM conversation_participants 
+       WHERE conversation_id IN (SELECT conversation_id FROM conversation_participants WHERE user_id = $1)
+       AND user_id = $2`,
+        [userId, friendId],
+      );
+
+      let conversationId;
+      if (convRes.rows.length === 0) {
+        const newConv = await pool.query(
+          "INSERT INTO conversations (type) VALUES ('dm') RETURNING id",
+        );
+        conversationId = newConv.rows[0].id;
+        await pool.query(
+          "INSERT INTO conversation_participants (conversation_id, user_id) VALUES ($1, $2), ($1, $3)",
+          [conversationId, userId, friendId],
+        );
+      } else {
+        conversationId = convRes.rows[0].conversation_id;
+      }
+
+      const messages = await pool.query(
+        `SELECT m.*, u.username as sender_name, -- Dodajemy to
+        (SELECT json_build_object('url', url, 'type', type) FROM media WHERE message_id = m.id LIMIT 1) as media
+        FROM messages m 
+        JOIN users u ON m.sender_id = u.id -- Dołączamy tabelę użytkowników
+        WHERE conversation_id = $1 
+        ORDER BY created_at ASC`,
+        [conversationId],
+      );
+      res.json({ conversation_id: conversationId, messages: messages.rows });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+);
+
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const PORT = process.env.PORT_BACKEND || 5000;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Serwer Node śmiga na porcie ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Serwer Node z Socket.IO śmiga na porcie ${PORT}`);
 });

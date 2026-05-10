@@ -18,7 +18,7 @@ export interface Rule {
 }
 
 export interface UserRole {
-  role: "member" | "moderator" | "admin";
+  role: "member" | "moderator" | "owner";
   can_delete_posts: boolean;
   can_ban_users: boolean;
   can_manage_mods: boolean;
@@ -55,17 +55,19 @@ export function PostArea() {
   const [error, setError] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  const currentUser = authEmitter.getUser();
-  const isOwner =
-    currentUser && communityData && currentUser.id === communityData.owner_id;
+  const isOwner = communityData?.currentUserRole?.role === "owner";
 
   const toggleCreatePost = () => setIsCreatingPost(!isCreatingPost);
 
-  // 1. Upewnij się, że highlightPostId jest pobierane bezpośrednio w komponencie
   const [searchParams] = useSearchParams();
-  const highlightPostId = searchParams.get("highlight");
+  const highlightPostId = searchParams.get("postId");
 
-  // 2. Funkcja loadPosts - zostawiamy ją w useCallback
+  const sortedPosts = highlightPostId
+    ? [...posts].sort((a, b) =>
+        a.id === highlightPostId ? -1 : b.id === highlightPostId ? 1 : 0,
+      )
+    : posts;
+
   const loadPosts = useCallback(
     async (cursor: string | null = null) => {
       if (isPostsLoading || (!hasMore && cursor !== null)) return;
@@ -74,13 +76,11 @@ export function PostArea() {
       try {
         const token = localStorage.getItem("token");
 
-        // Budujemy URL - używamy aktualnego highlightPostId z zasięgu komponentu
         let url = `http://localhost:5000/api/communities/${communityName}?limit=10`;
 
         if (cursor) {
           url += `&cursor=${cursor}`;
         } else if (highlightPostId) {
-          // Tylko przy pierwszym ładowaniu dodajemy highlight
           url += `&highlight=${highlightPostId}`;
         }
 
@@ -99,6 +99,7 @@ export function PostArea() {
 
         if (cursor === null) {
           setCommunityData(data);
+          setIsMember(!!data.currentUserRole);
           setPosts(data.posts || []);
         } else {
           setPosts((prev) => [...prev, ...(data.posts || [])]);
@@ -113,22 +114,17 @@ export function PostArea() {
         setIsLoading(false);
       }
     },
-    [communityName, hasMore, isPostsLoading, highlightPostId], // Te zależności są OK
+    [communityName, hasMore, isPostsLoading, highlightPostId],
   );
 
-  // 3. KLUCZOWA POPRAWKA: useEffect bez loadPosts w zależnościach
   useEffect(() => {
     if (communityName) {
       setPosts([]);
       setNextCursor(null);
       setHasMore(true);
 
-      // Wywołujemy funkcję, ale NIE dodajemy jej do tablicy [] niżej
       loadPosts(null);
-
-      setIsMember(authEmitter.isMemberOf(communityName));
     }
-    // Usuwamy loadPosts stąd, żeby uniknąć pętli
   }, [communityName, highlightPostId]);
 
   const handleDeleteCommunity = async () => {
@@ -288,6 +284,10 @@ export function PostArea() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [nextCursor, hasMore, isPostsLoading, loadPosts]);
 
+  const canAccessSettings =
+    communityData?.currentUserRole?.role === "owner" ||
+    communityData?.currentUserRole?.role === "moderator";
+
   if (isLoading) return <div className={styles.pageWrapper}>Ładowanie...</div>;
 
   if (communityData?.isBanned) {
@@ -303,18 +303,9 @@ export function PostArea() {
           </h1>
           <p className={styles.text}>
             Twoje konto zostało zablokowane w społeczności{" "}
-            <strong>{communityName}</strong>. Nie masz dostępu do przeglądania
-            postów ani ustawień.
+            <strong>{communityName}</strong>.
           </p>
-          <Link
-            to="/"
-            className={styles.submit}
-            style={{
-              marginTop: "20px",
-              textDecoration: "none",
-              display: "inline-block",
-            }}
-          >
+          <Link to="/" className={styles.submit}>
             Wróć na stronę główną
           </Link>
         </div>
@@ -343,11 +334,9 @@ export function PostArea() {
             />
             <h1 className={styles.text}>{communityData.name}</h1>
 
-            {(isOwner || communityData.currentUserRole?.role === "admin") && (
+            {canAccessSettings && (
               <Link to={`/communities_settings/${communityData.id}`}>
-                <button className={styles.settings}>
-                  <SettingsIcon className={styles.icons} />
-                </button>
+                <SettingsIcon className={styles.settingsIcon} />
               </Link>
             )}
           </div>
@@ -381,13 +370,14 @@ export function PostArea() {
         {isCreatingPost && <CreatePost />}
 
         <div className={styles.postsList}>
-          {posts.map((post) => (
+          {sortedPosts.map((post) => (
             <Post
               key={post.id}
               {...post}
               postId={post.id}
               communityId={communityData.id}
               rules={communityData.rules || []}
+              isHighlighted={post.id === highlightPostId}
               tags={post.tags || []}
               createdAt={post.displayDate || post.createdAt}
             />

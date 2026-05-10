@@ -1,0 +1,19 @@
+waf
+orm
+logowanie i rejestracja czy nie mozna przeladowac, jakos zlamac
+podstrona na dm
+	konwersacje z uzytkownikami
+	konwersacje z grupami
+	mozliwosc zaakceptowania zaproszenia
+	wyszukanie kontaktow
+	mozliwosc przeslania plikow
+komentarze
+	zagniezdzanie komentarzy
+	like dislike komentarzy
+nie wiem jak wyglada zarzadzanie spolecznoscia wiec bede musial to ogarnac czy czegos tam nie dodac
+
+zmiana stylu w wplisywaniu wartosci do logowani jest czarne powinno byc biale
+osobna podstrona na lowgowanie i rejestracje
+mozliwosc zmiany hasla
+
+sidebar

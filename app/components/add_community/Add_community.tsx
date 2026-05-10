@@ -4,7 +4,6 @@ import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CheckIcon from "@mui/icons-material/Check";
 import Search from "../search/Search";
 import DeleteIcon from "@mui/icons-material/Delete";
-// Import authEmitter - główny system zarządzania stanem autoryzacji
 import { authEmitter } from "../services/authEmitter";
 
 interface Rule {
@@ -69,8 +68,6 @@ export default function Add_community() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // Zamiast bezpośrednio czytać z localStorage, używamy authEmitter.getToken()
-    // To gwarantuje, że zawsze pracujemy z aktualnym tokenem
     const token = authEmitter.getToken();
     if (!token) {
       alert("Musisz być zalogowany!");
@@ -120,32 +117,20 @@ export default function Add_community() {
     }
   };
 
-  // State dla autoryzacji - zarządzany poprzez authEmitter
   const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // 1. Sprawdzamy stan POCZĄTKOWY - czy użytkownik jest już zalogowany
-    // authEmitter.isAuthenticated() zwraca true jeśli token istnieje w localStorage
     setIsAuthorized(authEmitter.isAuthenticated());
-
-    // 2. Definiujemy callback, który będzie wywoływany każdorazowo, gdy zmieni się stan autoryzacji
-    // Otrzymujemy obiekt z danymi: { isLoggedIn: boolean, user?: any }
     const handleAuthChange = (data: any) => {
       setIsAuthorized(data.isLoggedIn);
     };
-
-    // 3. Subskrybujemy się do zdarzenia "authChange" z authEmitter
-    // Teraz każdy raz gdy ktoś się zaloguje/wyloguje, ten callback się wywoła
     authEmitter.subscribe("authChange", handleAuthChange);
 
-    // 4. Cleanup function - ważne! Odpisujemy się od zdarzenia gdy komponent zostanie unmounted
-    // Zapobiega to memory leakom i błędom "setState on unmounted component"
     return () => {
       authEmitter.unsubscribe("authChange", handleAuthChange);
     };
-  }, []); // Pusta tablica zależności - efekt uruchamia się tylko raz przy mountowaniu
+  }, []);
 
-  // Jeśli użytkownik nie jest zalogowany, wyświetlamy komunikat błędu
   if (!isAuthorized) {
     return (
       <main className={styles.addCommunity}>

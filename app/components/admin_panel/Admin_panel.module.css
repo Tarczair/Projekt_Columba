@@ -1,209 +1,36 @@
-.container {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  gap: 100px;
-  padding: 60px;
-  background-color: var(--color-background);
-  font-family: "Inter", sans-serif;
-}
-
-.banContainer {
-  min-width: 580px;
-  height: 70vh;
-  background-color: var(--color-backgrounf-post);
-  overflow: hidden;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-secondary) transparent;
-  justify-content: space-evenly;
-}
-
-.text {
-  color: var(--color-text);
-  overflow-wrap: break-word;
-  word-break: break-all;
-}
-
-.name {
-  flex: 1;
-  color: var(--color-text);
-  overflow-wrap: break-word;
-  word-break: break-all;
-}
-
-.avatar {
-  max-width: 50px;
-  max-height: 50px;
-  padding-right: 20px;
-}
-
-.icon {
-  color: var(--color-text);
-  margin-left: 20px;
-}
-
-.userRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 30px;
-  border-bottom: 1px solid;
-  border-color: var(--color-border);
-}
-
-.btnUnban {
-  min-width: 150px;
-  height: 50px;
-  background-color: transparent;
-  border: none;
-  border: 2px solid;
-  border-color: var(--color-border);
-  border-radius: 20px;
-  color: var(--color-text);
-  display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  margin-left: 20px;
-  cursor: pointer;
-}
-
-.btnUnban:hover,
-.btnUnban:hover > .icon {
-  border-color: var(--color-secondary);
-  color: var(--color-secondary);
-}
-
-.btnSubmit {
-  background-color: var(--color-secondary);
-  border: none;
-  border-radius: 20px;
-  width: 100%;
-  height: 30px;
-  color: var(--color-text);
-  margin-top: 20px;
-}
-
-.reportedPosts {
-  margin: 100px;
-  height: 350px;
-  background-color: var(--color-backgrounf-post);
-  color: var(--color-text);
-  overflow: hidden;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-secondary) transparent;
-  flex: 2;
-}
-
-.tableHeaderTitle {
-  background-color: var(--color-primary);
-  padding: 12px;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.adminTable {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.adminTable th {
-  background-color: var(--color-backgrounf-post);
-  padding: 15px;
-  color: var(--color-text);
-}
-
-.adminTable td {
-  padding: 15px;
-  border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
-}
-
-.actionsCell {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-}
-
-.action {
-  text-align: center;
-}
-
-thead {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: var(--color-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.secondSection {
-  flex: 1;
-}
-
-.firstSection {
-  display: flex;
-  flex-direction: row;
-  flex: 1;
-  justify-content: space-evenly;
-  max-height: 700px;
-}
-
-.changeCommunity {
-  display: flex;
-  flex-direction: row;
-}
-
-.changeCommunity > div {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
 .containerAdmin {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 60px;
   padding: 60px;
   background-color: var(--color-background);
   font-family: "Inter", sans-serif;
 }
 
-.firstSection {
-  display: flex;
-  flex-direction: row;
-  gap: 30px;
-  height: 60vh;
-}
-
-.editForm {
-  display: flex;
-  flex-direction: row;
-  gap: 30px;
-  flex: 1;
-}
-
-.usersCol {
+.first {
   display: flex;
   flex-direction: column;
-  flex: 1;
+  gap: 20px;
 }
 
-.communityInfoCol {
+.formThreeColumns {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.column {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 15px;
-  flex: 1;
+  min-width: 0;
+}
+
+.editForm {
+  display: contents;
 }
 
 .inputWrapper {
@@ -231,6 +58,7 @@ thead {
 
 .textContent {
   flex: 1;
+  min-height: 150px;
   background-color: var(--color-backgrounf-post);
   border: 1px solid var(--color-border);
   border-radius: 5px;
@@ -241,7 +69,7 @@ thead {
 }
 
 .uploadBox {
-  height: 160px;
+  height: 120px;
   background-color: var(--color-backgrounf-post);
   border: 1px dashed var(--color-border);
   border-radius: 5px;
@@ -254,38 +82,33 @@ thead {
   color: var(--color-text);
 }
 
-.uploadBox:hover {
-  border-color: var(--color-secondary);
-}
-
 .uploadIcon {
-  font-size: 2.5rem !important;
-  margin-bottom: 10px;
+  font-size: 2rem !important;
+  margin-bottom: 5px;
   color: var(--color-text);
+  transform: rotate(-45deg) scale(1.2);
 }
 
-.tagsCol {
-  max-width: 750px;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
+.tagsContainer {
   background-color: var(--color-backgrounf-post);
   border: 1px solid var(--color-border);
   border-radius: 5px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
-.tagsHeader {
-  background-color: var(--color-backgrounf-post);
+.tableHeaderTitle {
+  background-color: var(--color-primary);
   padding: 15px;
   text-align: center;
   color: var(--color-text);
-  font-size: 0.9rem;
   font-weight: bold;
 }
 
 .searchBar {
-  background-color: var(--color-secondary);
+  background-color: var(--color-background-site);
   padding: 8px 15px;
   display: flex;
   align-items: center;
@@ -294,25 +117,28 @@ thead {
 .tagList {
   overflow-y: auto;
   flex: 1;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-secondary) transparent;
-  overflow-wrap: break-word;
-  word-break: break-all;
+  max-height: 400px;
 }
 
 .tagItem {
-  padding: 15px 20px;
+  padding: 12px 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--color-border);
   cursor: pointer;
   color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.tagItem.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .checkCircle {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border: 2px solid var(--color-border);
   border-radius: 50%;
   display: flex;
@@ -326,125 +152,203 @@ thead {
   color: var(--color-secondary);
 }
 
-.checkIcon {
-  font-size: 1rem !important;
-  color: var(--color-text);
+.rulesList {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 450px;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
 }
 
-.unbanned {
-  min-width: 180px;
-  height: 50px;
-  background-color: transparent;
-  border: none;
-  border: 2px solid;
-  border-color: var(--color-border);
-  border-radius: 20px;
-  color: var(--color-text);
+.rulesList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rulesList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.rulesList::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.ruleItem {
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
-  justify-content: space-evenly;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ruleInput,
+.ruleTextarea {
+  width: 100%;
+  padding: 10px;
+  background-color: var(--color-backgrounf-post);
+  border: 1px solid var(--color-border);
+  color: white;
+  border-radius: 5px;
+  outline: none;
+}
+
+.actionButtons {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.btnSubmit,
+.btnAddRule,
+.btnRemoveRule,
+.notMod,
+.isMod,
+.btnUnunban,
+.btnActionDelete,
+.btnActionIgnore {
+  display: inline-flex;
   align-items: center;
-  margin-left: 20px;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 25px;
+  border-radius: 50px;
+  border: 2px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: 600;
   cursor: pointer;
+  font-size: 13px;
+  text-transform: uppercase;
+  outline: none;
 }
 
-.unbanned:hover,
-.unbanned:hover > .icon {
+.btnSubmit {
   border-color: var(--color-secondary);
-  color: var(--color-secondary);
+  width: 100%;
+  max-width: 400px;
 }
 
-.banned {
-  min-width: 180px;
-  height: 50px;
-  background-color: transparent;
+.btnSubmit:hover {
+  background-color: var(--color-secondary);
+}
+
+.btnAddRule {
+  width: 100%;
+  border-style: solid;
+}
+
+.btnAddRule:hover {
+  background-color: var(--color-backgrounf-post);
+}
+
+.btnRemoveRule {
   border: none;
-  border: 2px solid;
-  border-color: var(--color-border);
-  border-radius: 20px;
-  color: var(--color-border);
-  display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  margin-left: 20px;
+  padding: 5px 0;
+  justify-content: flex-start;
+  color: #ff4444;
+  text-transform: none;
 }
 
-.banned > .icon {
-  color: var(--color-border);
+.btnRemoveRule:hover {
+  text-decoration: underline;
 }
+
+.banContainer {
+  background-color: var(--color-backgrounf-post);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 20px;
+}
+
+.userRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  margin-right: 15px;
+}
+
+.name {
+  color: var(--color-text);
+}
+
 .userActions {
   display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.notMod {
-  min-width: 250px;
-  height: 50px;
-  background-color: transparent;
-  border: 2px solid var(--color-border);
-  border-radius: 20px;
-  color: var(--color-text);
-  display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  cursor: pointer;
-}
-
-.notMod:hover,
-.notMod:hover > .icon {
-  border-color: var(--color-secondary);
-  color: var(--color-secondary);
+  gap: 10px;
 }
 
 .isMod {
-  min-width: 250px;
-  height: 50px;
-  background-color: transparent;
-  border: 2px solid var(--color-secondary);
-  border-radius: 20px;
-  color: var(--color-secondary);
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.notMod:hover {
+  border-color: var(--color-secondary);
+}
+
+.btnUnunban {
+  border-color: var(--color-border);
+}
+
+.btnUnunban:hover {
+  background-color: var(--color-primary);
+}
+
+.reportedPosts {
+  margin-top: 40px;
+  background-color: var(--color-backgrounf-post);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.adminTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.adminTable td {
+  padding: 15px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.adminTable thead td {
+  font-weight: bold;
+  background-color: var(--color-background-site);
+}
+
+.actionsCell {
   display: flex;
-  justify-content: space-evenly;
-  align-items: center;
-  cursor: pointer;
+  gap: 10px;
 }
 
-.isMod > .icon {
-  color: var(--color-secondary);
-}
-
-.isMod:hover {
+.btnActionDelete:hover {
+  background-color: #ff4444;
   border-color: #ff4444;
-  color: #ff4444;
 }
 
-.isMod:hover > .icon {
-  color: #ff4444;
+.btnActionIgnore:hover {
+  background-color: var(--color-secondary);
+  border-color: var(--color-secondary);
 }
-
-.isMod:disabled,
-.notMod:disabled {
-  cursor: not-allowed;
-  border-color: var(--color-border) !important;
-  color: var(--color-border) !important;
-}
-
-.isMod:disabled > .icon,
-.notMod:disabled > .icon {
-  color: var(--color-border) !important;
-}
-
-
-
-/* === NOWE STYLOWANIE MODALA === */
 
 .modalOverlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.72);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -452,184 +356,18 @@ thead {
 }
 
 .modalContent {
-  background-color: #1a2333;
-  border: 1px solid #2e3b52;
-  border-radius: 16px;
+  background: var(--color-backgrounf-post);
   padding: 30px;
-  width: 420px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-  font-family: "Inter", sans-serif;
+  border-radius: 15px;
+  width: 400px;
+  border: 1px solid var(--color-border);
 }
-
-.modalHeader {
-  color: #fff;
-  margin-bottom: 28px;
-  font-size: 1.25rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  text-align: center;
-  letter-spacing: 0.5px;
-}
-
-.permissionList {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-bottom: 32px;
-}
-
-/* === CUSTOM CHECKBOX / RADIO STYLE === */
 
 .customCheckContainer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 15px 0;
+  color: var(--color-text);
   cursor: pointer;
-  color: #fff;
-  position: relative;
-  padding: 14px 42px 14px 0;
-  font-size: 1rem;
-  font-weight: 500;
-  user-select: none;
-  border-radius: 10px;
-  transition: all 0.2s ease;
-}
-
-.customCheckContainer:hover {
-  color: #0088ff;
-}
-
-.customCheckContainer input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-  height: 0;
-  width: 0;
-}
-
-.customCheckmark {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  background-color: #0f172a;
-  border: 2px solid #3c485e;
-  border-radius: 50%;
-  transition: all 0.2s ease-in-out;
-}
-
-.customCheckContainer:hover input ~ .customCheckmark {
-  border-color: #0088ff;
-}
-
-.customCheckContainer input:checked ~ .customCheckmark {
-  background-color: #0088ff;
-  border-color: #0088ff;
-  box-shadow: 0 0 10px rgba(0, 136, 255, 0.55);
-}
-
-.customCheckmark:after {
-  content: "";
-  position: absolute;
-  display: none;
-}
-
-.customCheckContainer input:checked ~ .customCheckmark:after {
-  display: block;
-}
-
-.customCheckContainer .customCheckmark:after {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #fff;
-}
-
-/* === ACTION BUTTONS === */
-
-.modalActions {
-  display: flex;
-  gap: 14px;
-}
-
-.modalBtnCancel,
-.modalBtnConfirm {
-  flex: 1;
-  height: 46px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font-family: inherit;
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.modalBtnCancel {
-  background-color: rgba(60, 72, 94, 0.3);
-  border: 1px solid #3c485e;
-  color: #b0bac9;
-}
-
-.modalBtnCancel:hover {
-  background-color: #3c485e;
-  border-color: #4a5a75;
-  color: #fff;
-}
-
-.modalBtnConfirm {
-  background-color: #0088ff;
-  border: 1px solid #0088ff;
-  color: #fff;
-}
-
-.modalBtnConfirm:hover {
-  background-color: #0077dd;
-  border-color: #0077dd;
-}
-
-.modalBtnCancel:active,
-.modalBtnConfirm:active {
-  transform: scale(0.97);
-}
-
-/* === TABLE BUTTONS === */
-
-.tableActionBtn {
-  background-color: transparent;
-  border: 1px solid #3c485e;
-  color: #b0bac9;
-  font-family: inherit;
-  text-transform: uppercase;
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
-}
-
-.tableActionBtn:hover {
-  border-color: #ff4444;
-  color: #ff4444;
-}
-
-.loadingMessage {
-  color: #fff;
-  text-align: center;
-  margin-top: 50px;
-  font-size: 1.1rem;
-  font-weight: 500;
 }

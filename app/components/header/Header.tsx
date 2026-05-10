@@ -24,12 +24,12 @@ export function Header() {
   // const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"));
   //
   // NOWY KOD (bezpieczny - localStorage sprawdzane tylko po stronie klienta):
-const [isLoggedIn, setIsLoggedIn] = useState(() => {
-  if (typeof window !== "undefined") {
-    return authEmitter.isAuthenticated();
-  }
-  return false;
-});
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    if (typeof window !== "undefined") {
+      return authEmitter.isAuthenticated();
+    }
+    return false;
+  });
 
   useEffect(() => {
     //to takie "centrum nasłuchowe"
@@ -47,14 +47,14 @@ const [isLoggedIn, setIsLoggedIn] = useState(() => {
       // następnie znowu odwracamy ale więc mamy wartość z poczatku ale w systemie boolean.
     };
 
-    authEmitter.subscribe("authChange", handleAuthChange); //zasubskrybowanie czyli sprawienie że obserwator wysyła mu zmiane stanu. 
+    authEmitter.subscribe("authChange", handleAuthChange); //zasubskrybowanie czyli sprawienie że obserwator wysyła mu zmiane stanu.
     const handleMenuUpdate = () => setMenuVersion((prev) => prev + 1);
     authEmitter.subscribe("membersChanged", handleMenuUpdate);
     authEmitter.subscribe("reportsChanged", handleMenuUpdate);
     authEmitter.subscribe("bansChanged", handleMenuUpdate);
 
     return () => {
-      authEmitter.unsubscribe("authChange", handleAuthChange); //funkcja czyszcząca, zabezpieczenie przed wyciekiem pamięci. 
+      authEmitter.unsubscribe("authChange", handleAuthChange); //funkcja czyszcząca, zabezpieczenie przed wyciekiem pamięci.
       authEmitter.unsubscribe("membersChanged", handleMenuUpdate);
       authEmitter.unsubscribe("reportsChanged", handleMenuUpdate);
       authEmitter.unsubscribe("bansChanged", handleMenuUpdate);
@@ -110,9 +110,9 @@ const [isLoggedIn, setIsLoggedIn] = useState(() => {
                   ZAŁÓŻ SPOŁECZNOŚĆ{" "}
                   <GroupAddIcon className={styles.menuIcons} />
                 </Link>
-                <button className={styles.menuOption}>
-                  TWOJE POSTY <ChatIcon className={styles.menuIcons} />
-                </button>
+                <Link to="/dm" className={styles.menuOption}>
+                  TWOJE WIADOMOŚCI <ChatIcon className={styles.menuIcons} />
+                </Link>
               </>
             )}
           </div>

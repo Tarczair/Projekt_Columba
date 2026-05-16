@@ -79,10 +79,15 @@ export default function Add_community() {
     const formData = new FormData();
     formData.append("name", title);
     formData.append("description", description);
-    formData.append("tags", JSON.stringify(selectedTags));
+    const validRules = rules
+      .filter((r) => r.rule_title.trim() !== "")
+      .map((r) => ({
+        rule_title: r.rule_title,
+        description: r.description,
+      }));
 
-    const validRules = rules.filter((r) => r.rule_title.trim() !== "");
     formData.append("rules", JSON.stringify(validRules));
+    formData.append("tags", JSON.stringify(selectedTags));
 
     if (fileInputRef.current?.files?.[0]) {
       formData.append("avatar", fileInputRef.current.files[0]);
@@ -102,18 +107,11 @@ export default function Add_community() {
       if (response.ok) {
         alert("Społeczność stworzona pomyślnie!");
       } else {
-        if (contentType && contentType.includes("application/json")) {
-          const errData = await response.json();
-          alert(errData.error || "Błąd podczas tworzenia");
-        } else {
-          alert(
-            `Błąd serwera: ${response.status} (Nie znaleziono ścieżki lub krytyczny błąd)`,
-          );
-        }
+        const errData = await response.json();
+        alert(errData.error || "Błąd podczas tworzenia");
       }
     } catch (err) {
       console.error("Błąd połączenia:", err);
-      alert("Błąd połączenia z serwerem. Upewnij się, że backend działa.");
     }
   };
 

@@ -60,17 +60,23 @@ export default function Admin_panel({ role }: AdminPanelProps) {
     if (!communityId) return;
     try {
       const memRes = await fetch(
-        `http://localhost:5000/api/communities/${communityId}/members`,
+        `http://localhost:5000/api/communities-by-id/${communityId}/members`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
       );
+      if (!memRes.ok) throw new Error("Błąd pobierania członków");
       const membersData = await memRes.json();
+
       setUsers(
         membersData.map((u: any) => ({
           id: u.id,
           name: u.username,
+          username: u.username,
           avatarPath: u.avatar_url || "/img/pepe_placeholder.png",
+          role: u.role,
           isMod: u.role === "moderator",
           isOwner: u.role === "owner",
           isBanned: u.is_banned,
@@ -96,9 +102,9 @@ export default function Admin_panel({ role }: AdminPanelProps) {
         let allTags: any[] = [];
         if (tagsRes.ok) {
           const tagsData = await tagsRes.json();
-          allTags = tagsData.map((t: string, index: number) => ({
+          allTags = tagsData.map((t: any, index: number) => ({
             id: index,
-            name: t,
+            name: typeof t === "string" ? t : t.name,
             isSelected: false,
           }));
         }
@@ -113,10 +119,11 @@ export default function Admin_panel({ role }: AdminPanelProps) {
         if (detailsRes.ok) {
           const details = await detailsRes.json();
           setCommunityName(details.name);
-          setCommunityDesc(details.description || "");
+          setCommunityDesc(details.desc || details.description || "");
           setRules(details.rules || []);
 
-          const communityTags = details.tags || [];
+          const communityTags =
+            details.community_tags?.map((ct: any) => ct.tags.name) || [];
           const syncedTags = allTags.map((tag) => ({
             ...tag,
             isSelected: communityTags.includes(tag.name),
@@ -127,13 +134,16 @@ export default function Admin_panel({ role }: AdminPanelProps) {
         await fetchMembers();
 
         const repRes = await fetch(
-          `http://localhost:5000/api/communities/${communityId}/reports`,
+          `http://localhost:5000/api/communities-by-id/${communityId}/reports`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
         );
         if (repRes.ok) {
-          setReports(await repRes.json());
+          const reportsData = await repRes.json();
+          if (Array.isArray(reportsData)) {
+            setReports(reportsData);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -277,10 +287,13 @@ export default function Admin_panel({ role }: AdminPanelProps) {
   const handleDeleteReport = async (reportId: string) => {
     const token = localStorage.getItem("token");
     try {
-      const res = await fetch(`http://localhost:5000/api/reports/${reportId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `http://localhost:5000/api/communities-by-id/${communityId}/reports/${reportId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (res.ok) {
         setReports((prev) => prev.filter((r) => r.id !== reportId));
         authEmitter.emit("reportsChanged");
@@ -308,7 +321,7 @@ export default function Admin_panel({ role }: AdminPanelProps) {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/communities/${communityId}`,
+        `http://localhost:5000/api/communities-by-id/${communityId}`,
         {
           method: "PUT",
           headers: { Authorization: `Bearer ${token}` },
@@ -480,7 +493,9 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                 <img className={styles.avatar} src={user.avatarPath} alt="" />
                 <span className={styles.name}>{user.name}</span>
               </div>
-              {!user.isOwner && (
+
+              {/* ZMIANA TUTAJ: Sprawdzamy czy rola to NIE 'owner' (wielkość liter dopasowana do bazy) */}
+              {user.role !== "owner" && user.role !== "OWNER" && (
                 <div className={styles.userActions}>
                   <button
                     type="button"

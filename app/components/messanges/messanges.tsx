@@ -30,6 +30,7 @@ interface Message {
   created_at: string;
   media?: Media;
   sender_name: string;
+  id?: string | number;
 }
 
 export function Messanges() {
@@ -63,24 +64,36 @@ export function Messanges() {
       if (currentUserId) newSocket.emit("join_personal_room", currentUserId);
     });
 
-    newSocket.on("receive_message", (message: Message) => {
+    newSocket.on("receiveMessage", (message: Message) => {
       const currentConv = activeConvRef.current;
+
       const isCurrentChat =
-        currentConv?.conversation_id === message.conversation_id;
+        currentConv &&
+        String(currentConv.conversation_id) == String(message.conversation_id);
 
       if (isCurrentChat) {
-        setMessages((prev) => [...prev, message]);
+        setMessages((prev) => {
+          const isDuplicate = prev.some(
+            (m) =>
+              (m.id && m.id === message.id) ||
+              (m.created_at === message.created_at &&
+                m.content === message.content),
+          );
+          if (isDuplicate) return prev;
+          return [...prev, message];
+        });
       }
 
       setFriends((prev) => {
         const updated = prev.map((f) => {
-          if (
-            f.conversation_id === message.conversation_id ||
-            f.id === message.sender_id
-          ) {
+          const isTargetFriend =
+            String(f.conversation_id) == String(message.conversation_id) ||
+            String(f.id) == String(message.sender_id);
+
+          if (isTargetFriend) {
             return {
               ...f,
-              conversation_id: message.conversation_id,
+              conversation_id: String(message.conversation_id),
               unreadCount: isCurrentChat ? 0 : (f.unreadCount || 0) + 1,
               lastMessageDate: new Date(message.created_at),
             };
@@ -103,7 +116,7 @@ export function Messanges() {
     return () => {
       newSocket.disconnect();
     };
-  }, []);
+  }, [currentUserId]);
 
   const fetchData = async () => {
     const token = authEmitter.getToken();
@@ -123,13 +136,37 @@ export function Messanges() {
       );
       if (resInvites.ok) setInvites(await resInvites.json());
     } catch (err) {
-      console.error("Błąd pobierania danych:", err);
+      console.error(err);
     }
   };
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleSelectFriend = async (friend: Friend) => {
+    const token = authEmitter.getToken();
+    try {
+      const res = await fetch(
+        `http://localhost:5000/api/conversations/friend/${friend.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.messages || []);
+        setActiveConversation({
+          ...friend,
+          conversation_id: data.conversation_id,
+        });
+
+        socket?.emit("join_conversation", data.conversation_id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const handleInviteResponse = async (
     friendshipId: string,
@@ -149,7 +186,7 @@ export function Messanges() {
         fetchData();
       }
     } catch (err) {
-      console.error("Błąd odpowiedzi na zaproszenie:", err);
+      console.error(err);
     }
   };
 
@@ -171,84 +208,38 @@ export function Messanges() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error("Błąd pobierania:", error);
+      console.error(error);
       window.open(url, "_blank");
     }
   };
 
   const sendMessage = async () => {
-    if (
-      (!currentMessage.trim() && !selectedFile) ||
-      !activeConversation?.conversation_id
-    )
-      return;
+    if (!currentMessage.trim() && !selectedFile) return;
+    if (!activeConversation || !activeConversation.conversation_id) return;
 
     const token = authEmitter.getToken();
     const formData = new FormData();
+
     formData.append("conversationId", activeConversation.conversation_id);
     formData.append("content", currentMessage);
-    if (selectedFile) formData.append("file", selectedFile);
+    if (selectedFile) {
+      formData.append("media", selectedFile);
+    }
+
+    setCurrentMessage("");
+    setSelectedFile(null);
 
     try {
       const res = await fetch("http://localhost:5000/api/messages/send", {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
 
-      if (res.ok) {
-        const savedMsg = await res.json();
-
-        socket?.emit("send_message", {
-          ...savedMsg,
-          receiver_id: activeConversation.id,
-          conversation_id: activeConversation.conversation_id,
-        });
-
-        setMessages((prev) => [...prev, savedMsg]);
-
-        setFriends((prev) => {
-          const updated = prev.map((f) =>
-            f.id === activeConversation.id
-              ? { ...f, lastMessageDate: new Date() }
-              : f,
-          );
-          return [...updated].sort((a, b) => {
-            const dateA = a.lastMessageDate
-              ? new Date(a.lastMessageDate).getTime()
-              : 0;
-            const dateB = b.lastMessageDate
-              ? new Date(b.lastMessageDate).getTime()
-              : 0;
-            return dateB - dateA;
-          });
-        });
-
-        setCurrentMessage("");
-        setSelectedFile(null);
-      }
-    } catch (err) {
-      console.error("Błąd wysyłania:", err);
-    }
-  };
-
-  const handleSelectFriend = async (friend: Friend) => {
-    const token = authEmitter.getToken();
-    try {
-      const res = await fetch(
-        `http://localhost:5000/api/conversations/friend/${friend.id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setMessages(data.messages || []);
-        setActiveConversation({
-          ...friend,
-          conversation_id: data.conversation_id,
-        });
-        socket?.emit("join_conversation", data.conversation_id);
+      if (!res.ok) {
+        console.error("Error");
       }
     } catch (err) {
       console.error(err);

@@ -68,6 +68,29 @@ export default function UserProfile() {
       alert("Musisz się zalogować, aby dodać znajomego.");
       return;
     }
+    if (!user) return;
+
+    const previousStatus = user.friendshipStatus;
+
+    let nextStatus: "none" | "request_sent" | "friends" = "none";
+    switch (previousStatus) {
+      case "none":
+        nextStatus = "request_sent";
+        break;
+      case "request_received":
+        nextStatus = "friends";
+        break;
+      case "request_sent":
+      case "friends":
+        nextStatus = "none";
+        break;
+      default:
+        nextStatus = "none";
+    }
+
+    setUser((prev) =>
+      prev ? { ...prev, friendshipStatus: nextStatus } : null,
+    );
 
     try {
       const response = await fetch(
@@ -83,12 +106,21 @@ export default function UserProfile() {
 
       if (response.ok) {
         const data = await response.json();
+        if (data && data.friendshipStatus) {
+          setUser((prev) =>
+            prev ? { ...prev, friendshipStatus: data.friendshipStatus } : null,
+          );
+        }
+      } else {
         setUser((prev) =>
-          prev ? { ...prev, friendshipStatus: data.status } : null,
+          prev ? { ...prev, friendshipStatus: previousStatus } : null,
         );
       }
     } catch (err) {
       console.error("Błąd zmiany statusu znajomego:", err);
+      setUser((prev) =>
+        prev ? { ...prev, friendshipStatus: previousStatus } : null,
+      );
     }
   };
 

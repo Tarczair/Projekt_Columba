@@ -30,9 +30,13 @@ export default function HomeFeed() {
   useEffect(() => {
     const fetchFeed = async () => {
       try {
-        const token = localStorage.getItem("token");
-        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch("http://localhost:5000/api/homefeed", { headers });
+        const token = authEmitter.getToken();
+        const headers: Record<string, string> = token
+          ? { Authorization: `Bearer ${token}` }
+          : {};
+        const res = await fetch("http://localhost:5000/api/homefeed", {
+          headers,
+        });
         const json = await res.json();
         setFeedData(json.data || []);
         setNextCursor(json.nextCursor);
@@ -47,10 +51,13 @@ export default function HomeFeed() {
   }, []);
 
   const handleJoin = async (communityName: string) => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
     try {
+      const token = authEmitter.getToken();
+      if (!token) {
+        alert("Musisz być zalogowany, aby dołączyć do społeczności.");
+        return;
+      }
+
       const res = await fetch("http://localhost:5000/api/joincommunity", {
         method: "POST",
         headers: {
@@ -60,19 +67,44 @@ export default function HomeFeed() {
         body: JSON.stringify({ name: communityName }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
-        const user = authEmitter.getUser();
-        if (user) {
-          user.communities = [
-            ...(user.communities || []),
-            { name: communityName },
-          ];
-          localStorage.setItem("user", JSON.stringify(user));
-          setFeedData([...feedData]);
+        const currentUser = authEmitter.getUser();
+        if (currentUser) {
+          const updatedCommunities = currentUser.communities
+            ? [...currentUser.communities]
+            : [];
+
+          if (
+            !updatedCommunities.some(
+              (c: any) => c.name.toLowerCase() === communityName.toLowerCase(),
+            )
+          ) {
+            updatedCommunities.push({ name: communityName });
+          }
+
+          authEmitter.login(token, {
+            ...currentUser,
+            communities: updatedCommunities,
+          });
         }
+
+        setFeedData((prevData) =>
+          prevData.map((item) =>
+            item.communityName === communityName
+              ? { ...item, isMember: true }
+              : item,
+          ),
+        );
+      } else {
+        alert(
+          `Błąd: ${data.error || "Nie udało się dołączyć do społeczności."}`,
+        );
       }
     } catch (err) {
-      console.error("Błąd dołączania:", err);
+      console.error(err);
+      alert("Wystąpił błąd podczas połączenia z serwerem.");
     }
   };
 
@@ -131,7 +163,10 @@ export default function HomeFeed() {
                 postId={item.post.id}
                 communityId={item.communityId}
                 rules={item.communityRules || []}
-                createdAt={new Date(item.post.createdAt).toLocaleDateString()}
+                createdAt={
+                  item.post.displayDate ||
+                  new Date(item.post.created_at).toLocaleDateString()
+                }
               />
             </div>
           );

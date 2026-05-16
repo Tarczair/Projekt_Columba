@@ -94,42 +94,53 @@ export function Post({
   };
 
   const handleSubmitReport = async () => {
-    console.log("DEBUG: postId =", postId);
-    console.log("DEBUG: communityId =", communityId);
-    console.log("DEBUG: selectedRuleId =", selectedRuleId);
-    // Przygotowanie danych z nazwami pól dokładnie takimi, jakich chce backend
-    const reportBody = {
-      post_id: postId,
-      community_id: communityId,
-      // Jeśli wybrano "other", rule_id musi być null (bo "other" to nie UUID)
-      rule_id: selectedRuleId === "other" ? null : selectedRuleId,
-      // Jeśli wybrano "other", opis leci do description
-      description: selectedRuleId === "other" ? customReason : null,
-    };
+    if (!selectedRuleId) return;
+
+    const token = authEmitter.getToken();
+    if (!token) {
+      alert("Musisz być zalogowany, aby zgłosić post.");
+      return;
+    }
+
+    let sendRuleId: string | null = null;
+    let sendDescription: string | null = null;
+
+    if (selectedRuleId === "other") {
+      sendRuleId = null;
+      sendDescription = customReason.trim();
+    } else {
+      const foundRule = rules.find((r) => r.rule_title === selectedRuleId);
+      sendRuleId = foundRule ? foundRule.rule_title : selectedRuleId;
+      sendDescription = null;
+    }
 
     try {
-      const token = localStorage.getItem("token");
       const res = await fetch("http://localhost:5000/api/reports", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(reportBody),
+        body: JSON.stringify({
+          post_id: postId,
+          community_id: communityId,
+          rule_id: sendRuleId,
+          description: sendDescription,
+        }),
       });
 
       if (res.ok) {
-        alert("Zgłoszenie zostało wysłane.");
+        alert("Zgłoszenie zostało wysłane pomyślnie.");
         setIsReportModalOpen(false);
         setSelectedRuleId("");
         setCustomReason("");
       } else {
-        const errorData = await res.json();
-        alert(`Błąd: ${errorData.error}`);
+        const errData = await res.json();
+        alert(`Błąd zgłaszania: ${errData.error || "Nieznany błąd"}`);
       }
     } catch (err) {
-      console.error("Błąd podczas wysyłania zgłoszenia:", err);
-      alert("Wystąpił błąd połączenia.");
+      console.error("Błąd podczas wysyłania raportu:", err);
+      alert("Wystąpił błąd sieci podczas wysyłania zgłoszenia.");
     }
   };
 

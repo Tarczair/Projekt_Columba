@@ -3,6 +3,7 @@ import { useParams } from "react-router";
 import Moderator_panel from "../components/admin_panel/Moderator_panel";
 import Admin_panel from "../components/admin_panel/Admin_panel";
 import type { CommunityData } from "../components/post_area/PostArea";
+import { authEmitter } from "~/components/services/authEmitter";
 
 export default function Comm_settings() {
   const { communityId } = useParams();

@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model comments {
+  id             String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  parent_id      String?    @db.Uuid
+  comment        String
+  post_id        String?    @db.Uuid
+  user_id        String?    @db.Uuid
+  upvotes_count  Int?       @default(0)
+  replies_count  Int?       @default(0)
+  updated_at     DateTime?  @db.Timestamp(6)
+  deleted_at     DateTime?  @db.Timestamp(6)
+  created_at     DateTime?  @default(now()) @db.Timestamp(6)
+  comments       comments?  @relation("commentsTocomments", fields: [parent_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  other_comments comments[] @relation("commentsTocomments")
+  posts          posts?     @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?     @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  reports        reports[]
+}
+
+model communities {
+  id                String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name              String                   @unique
+  description       String?
+  avatar_url        String?
+  owner_id          String?                  @db.Uuid
+  is_private        Boolean?                 @default(false)
+  search_vector     Unsupported("tsvector")?
+  created_at        DateTime?                @default(now()) @db.Timestamp(6)
+  users             users?                   @relation(fields: [owner_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  community_members community_members[]
+  community_tags    community_tags[]
+  posts             posts[]
+  reports           reports[]
+  rules             rules[]
+  users_banned      users_banned[]
+
+  @@index([search_vector], map: "communities_search_idx", type: Gin)
+}
+
+model community_members {
+  id               String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  community_id     String?        @db.Uuid
+  user_id          String?        @db.Uuid
+  status           member_status? @default(active)
+  role             member_role?   @default(member)
+  can_delete_posts Boolean?       @default(false)
+  can_ban_users    Boolean?       @default(false)
+  can_manage_mods  Boolean?       @default(false)
+  joined_at        DateTime?      @default(now()) @db.Timestamp(6)
+  communities      communities?   @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users            users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([community_id, user_id])
+}
+
+model community_tags {
+  community_id String      @db.Uuid
+  tag_id       String      @db.Uuid
+  communities  communities @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tags         tags        @relation(fields: [tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([community_id, tag_id])
+}
+
+model conversation_participants {
+  id              String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  conversation_id String?        @db.Uuid
+  user_id         String?        @db.Uuid
+  joined_at       DateTime?      @default(now()) @db.Timestamp(6)
+  conversations   conversations? @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([conversation_id, user_id])
+}
+
+model conversations {
+  id                        String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  type                      String?
+  created_at                DateTime?                   @default(now()) @db.Timestamp(6)
+  conversation_participants conversation_participants[]
+  messages                  messages[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model friendships {
+  id                                 String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id_1                          String?            @db.Uuid
+  user_id_2                          String?            @db.Uuid
+  status                             friendship_status? @default(pending)
+  created_at                         DateTime?          @default(now()) @db.Timestamp(6)
+  users_friendships_user_id_1Tousers users?             @relation("friendships_user_id_1Tousers", fields: [user_id_1], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_friendships_user_id_2Tousers users?             @relation("friendships_user_id_2Tousers", fields: [user_id_2], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id_1, user_id_2])
+}
+
+model media {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  post_id    String?   @db.Uuid
+  message_id String?   @db.Uuid
+  type       String?
+  url        String
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  messages   messages? @relation(fields: [message_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  posts      posts?    @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+}
+
+model messages {
+  id              String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sender_id       String?                  @db.Uuid
+  conversation_id String?                  @db.Uuid
+  content         String?
+  search_vector   Unsupported("tsvector")?
+  is_edited       Boolean?                 @default(false)
+  is_read         Boolean?                 @default(false)
+  updated_at      DateTime?                @db.Timestamp(6)
+  created_at      DateTime?                @default(now()) @db.Timestamp(6)
+  media           media[]
+  conversations   conversations?           @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users           users?                   @relation(fields: [sender_id], references: [id], onUpdate: NoAction)
+}
+
+model post_tags {
+  post_id String @db.Uuid
+  tag_id  String @db.Uuid
+  posts   posts  @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tags    tags   @relation(fields: [tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([post_id, tag_id])
+}
+
+model posts {
+  id             String                   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title          String?
+  post           String?
+  main_image_url String?
+  user_id        String?                  @db.Uuid
+  community_id   String?                  @db.Uuid
+  upvotes_count  Int?                     @default(0)
+  comments_count Int?                     @default(0)
+  search_vector  Unsupported("tsvector")?
+  is_spoiler     Boolean?                 @default(false)
+  updated_at     DateTime?                @db.Timestamp(6)
+  deleted_at     DateTime?                @db.Timestamp(6)
+  created_at     DateTime?                @default(now()) @db.Timestamp(6)
+  comments       comments[]
+  media          media[]
+  post_tags      post_tags[]
+  communities    communities?             @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users?                   @relation(fields: [user_id], references: [id], onUpdate: NoAction)
+  reports        reports[]
+  votes          votes[]
+
+  @@index([search_vector], map: "posts_search_idx", type: Gin)
+}
+
+model reports {
+  id                                    String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  description                           String?
+  reporter_id                           String?        @db.Uuid
+  post_id                               String?        @db.Uuid
+  comment_id                            String?        @db.Uuid
+  reported_user_id                      String?        @db.Uuid
+  rule_id                               String?        @db.Uuid
+  community_id                          String?        @db.Uuid
+  status                                report_status? @default(pending)
+  created_at                            DateTime?      @default(now()) @db.Timestamp(6)
+  comments                              comments?      @relation(fields: [comment_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  communities                           communities?   @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  posts                                 posts?         @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_reports_reported_user_idTousers users?         @relation("reports_reported_user_idTousers", fields: [reported_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_reports_reporter_idTousers      users?         @relation("reports_reporter_idTousers", fields: [reporter_id], references: [id], onUpdate: NoAction)
+  rules                                 rules?         @relation(fields: [rule_id], references: [id], onUpdate: NoAction)
+}
+
+model roles {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  role        String    @unique
+  description String?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users[]
+}
+
+model rules {
+  id           String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  community_id String?      @db.Uuid
+  rule_title   String
+  description  String?
+  created_at   DateTime?    @default(now()) @db.Timestamp(6)
+  reports      reports[]
+  communities  communities? @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+}
+
+model tags {
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name           String           @unique
+  community_tags community_tags[]
+  post_tags      post_tags[]
+}
+
+model users {
+  id                                            String                      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username                                      String                      @unique
+  email                                         String                      @unique
+  password_hash                                 String
+  avatar_url                                    String?
+  bio                                           String?
+  role_id                                       String?                     @db.Uuid
+  is_active                                     Boolean?                    @default(true)
+  search_vector                                 Unsupported("tsvector")?
+  created_at                                    DateTime?                   @default(now()) @db.Timestamp(6)
+  comments                                      comments[]
+  communities                                   communities[]
+  community_members                             community_members[]
+  conversation_participants                     conversation_participants[]
+  friendships_friendships_user_id_1Tousers      friendships[]               @relation("friendships_user_id_1Tousers")
+  friendships_friendships_user_id_2Tousers      friendships[]               @relation("friendships_user_id_2Tousers")
+  media                                         media[]
+  messages                                      messages[]
+  posts                                         posts[]
+  reports_reports_reported_user_idTousers       reports[]                   @relation("reports_reported_user_idTousers")
+  reports_reports_reporter_idTousers            reports[]                   @relation("reports_reporter_idTousers")
+  roles                                         roles?                      @relation(fields: [role_id], references: [id], onUpdate: NoAction)
+  users_banned_users_banned_banned_by_idTousers users_banned[]              @relation("users_banned_banned_by_idTousers")
+  users_banned_users_banned_user_idTousers      users_banned[]              @relation("users_banned_user_idTousers")
+  votes                                         votes[]
+
+  @@index([search_vector], map: "users_search_idx", type: Gin)
+}
+
+model users_banned {
+  id                                     String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id                                String?      @db.Uuid
+  banned_by_id                           String?      @db.Uuid
+  community_id                           String?      @db.Uuid
+  description                            String?
+  is_active                              Boolean?     @default(true)
+  expires_at                             DateTime?    @db.Timestamp(6)
+  created_at                             DateTime?    @default(now()) @db.Timestamp(6)
+  users_users_banned_banned_by_idTousers users?       @relation("users_banned_banned_by_idTousers", fields: [banned_by_id], references: [id], onUpdate: NoAction)
+  communities                            communities? @relation(fields: [community_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_users_banned_user_idTousers      users?       @relation("users_banned_user_idTousers", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, community_id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model votes {
+  id         String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id    String?   @db.Uuid
+  post_id    String?   @db.Uuid
+  value      Int?      @db.SmallInt
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  posts      posts?    @relation(fields: [post_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, post_id])
+}
+
+enum friendship_status {
+  pending
+  accepted
+  blocked
+}
+
+enum member_role {
+  member
+  moderator
+  owner
+}
+
+enum member_status {
+  active
+  muted
+}
+
+enum report_status {
+  pending
+  resolved
+  dismissed
+}

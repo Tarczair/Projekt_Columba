@@ -38,6 +38,10 @@
   width: 300px;
 }
 
+.textInput {
+  color: var(--color-text);
+}
+
 .textInput::placeholder {
   color: var(--color-text);
 }

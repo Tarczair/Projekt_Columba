@@ -81,6 +81,7 @@
   gap: 8px;
   padding: 10px;
   min-width: 120px;
+  position: relative;
 }
 
 .invateContainer {
@@ -102,9 +103,9 @@
 
 .closeIcon {
   position: absolute;
-  top: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
+  top: 10px;
+  right: 30px;
+  background: transparent;
   border-radius: 50%;
   font-size: 14px !important;
   cursor: pointer;

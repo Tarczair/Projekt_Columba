@@ -13,6 +13,7 @@ import type { UserRole } from "../post_area/PostArea";
 import RemoveCircleOutlineIcon from "@mui/icons-material/RemoveCircle";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircle";
 import BlockIcon from "@mui/icons-material/Block";
+import RemoveCircleIcon from "@mui/icons-material/RemoveCircle";
 
 interface Report {
   id: string;
@@ -494,7 +495,6 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                 <span className={styles.name}>{user.name}</span>
               </div>
 
-              {/* ZMIANA TUTAJ: Sprawdzamy czy rola to NIE 'owner' (wielkość liter dopasowana do bazy) */}
               {user.role !== "owner" && user.role !== "OWNER" && (
                 <div className={styles.userActions}>
                   <button
@@ -506,7 +506,7 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                   >
                     {user.isMod ? "MODERATOR" : "DAJ MODA"}{" "}
                     {user.isMod ? (
-                      <GavelIcon fontSize="inherit" />
+                      <RemoveCircleIcon className={styles.icon} />
                     ) : (
                       <PersonAddIcon fontSize="inherit" />
                     )}
@@ -613,6 +613,19 @@ export default function Admin_panel({ role }: AdminPanelProps) {
                   setTempPermissions({
                     ...tempPermissions,
                     can_ban_users: e.target.checked,
+                  })
+                }
+              />
+            </label>
+            <label className={styles.customCheckContainer}>
+              <span>ZARZĄDZANIE MODERATORAMI</span>
+              <input
+                type="checkbox"
+                checked={tempPermissions.can_manage_mods}
+                onChange={(e) =>
+                  setTempPermissions({
+                    ...tempPermissions,
+                    can_manage_mods: e.target.checked,
                   })
                 }
               />

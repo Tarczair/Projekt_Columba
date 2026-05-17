@@ -62,6 +62,12 @@
   border-color: var(--color-secondary);
 }
 
+.settingsIcon {
+  color: var(--color-text);
+  font-size: 30px;
+  margin-left: 20px;
+}
+
 .communityLogo {
   max-width: 80px;
   max-height: 80px;

@@ -94,13 +94,16 @@ export default function Add_community() {
     }
 
     try {
-      const response = await fetch("http://localhost:5000/api/communities", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const response = await fetch(
+        "http://localhost:5000/api/createcommunity",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
         },
-        body: formData,
-      });
+      );
 
       const contentType = response.headers.get("content-type");
 

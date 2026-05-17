@@ -620,7 +620,6 @@ exports.updateCommunity = async (req, res) => {
 
 exports.updateMemberPermissions = async (req, res) => {
   const { communityId, userId } = req.params;
-  const { can_delete_posts, can_ban_users, can_manage_mods, role } = req.body;
   const requesterId = req.user.userId;
 
   try {
@@ -632,8 +631,22 @@ exports.updateMemberPermissions = async (req, res) => {
       return res.status(404).json({ error: "Nie znaleziono społeczności" });
     }
 
-    if (comm.owner_id !== requesterId) {
-      return res.status(403).json({ error: "Tylko właściciel może to robić" });
+    const requesterMember = await prisma.community_members.findFirst({
+      where: {
+        community_id: communityId,
+        user_id: requesterId,
+      },
+    });
+
+    const hasPermission =
+      comm.owner_id === requesterId ||
+      (requesterMember && requesterMember.can_manage_mods === true);
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        error:
+          "Nie masz uprawnień do zarządzania moderatorami w tej społeczności.",
+      });
     }
 
     if (userId === comm.owner_id) {
@@ -642,12 +655,41 @@ exports.updateMemberPermissions = async (req, res) => {
       });
     }
 
-    await prisma.community_members.updateMany({
-      where: { community_id: communityId, user_id: userId },
-      data: { role, can_delete_posts, can_ban_users, can_manage_mods },
+    const can_delete_posts = String(req.body.can_delete_posts) === "true";
+    const can_ban_users = String(req.body.can_ban_users) === "true";
+    const can_manage_mods = String(req.body.can_manage_mods) === "true";
+
+    const existingMember = await prisma.community_members.findFirst({
+      where: {
+        community_id: communityId,
+        user_id: userId,
+      },
     });
 
-    res.json({ message: "Uprawnienia zaktualizowane!" });
+    if (existingMember) {
+      await prisma.community_members.updateMany({
+        where: { community_id: communityId, user_id: userId },
+        data: {
+          role: "moderator",
+          can_delete_posts,
+          can_ban_users,
+          can_manage_mods,
+        },
+      });
+    } else {
+      await prisma.community_members.create({
+        data: {
+          community_id: communityId,
+          user_id: userId,
+          role: "moderator",
+          can_delete_posts,
+          can_ban_users,
+          can_manage_mods,
+        },
+      });
+    }
+
+    res.json({ message: "Uprawnienia zaktualizowane pomyślnie!" });
   } catch (err) {
     console.error("Błąd aktualizacji uprawnień:", err);
     res.status(500).json({ error: err.message });

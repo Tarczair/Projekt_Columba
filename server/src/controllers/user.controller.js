@@ -114,7 +114,6 @@ exports.toggleFriendship = async (req, res) => {
     const currentUserId = Number(req.user.userId);
     const { username } = req.params;
 
-    // 1. Znajdź użytkownika, którego profil przeglądamy
     const targetUser = await prisma.users.findUnique({
       where: { username: username },
     });
@@ -129,7 +128,6 @@ exports.toggleFriendship = async (req, res) => {
       return res.status(400).json({ friendshipStatus: "self" });
     }
 
-    // 2. Sprawdź, czy relacja (zaproszenie/znajomość) już istnieje
     const existingFriendship = await prisma.friendships.findFirst({
       where: {
         OR: [
@@ -139,16 +137,12 @@ exports.toggleFriendship = async (req, res) => {
       },
     });
 
-    // 3. Jeśli relacja istnieje – usuwamy ją (cofnięcie zaproszenia / usunięcie ze znajomych)
     if (existingFriendship) {
       await prisma.friendships.delete({
         where: { id: existingFriendship.id },
       });
       return res.json({ friendshipStatus: "none" });
-    }
-
-    // 4. Jeśli relacja nie istnieje – tworzymy nowe zaproszenie
-    else {
+    } else {
       await prisma.friendships.create({
         data: {
           user_id_1: currentUserId,

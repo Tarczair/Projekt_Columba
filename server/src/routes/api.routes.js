@@ -1,6 +1,9 @@
 const router = require("express").Router();
 const { verifyToken } = require("../middleware/auth");
-const { authLimiter } = require("../middleware/security");
+const {
+  authLimiter,
+  checkCommunityPermission,
+} = require("../middleware/security");
 const upload = require("../middleware/upload");
 
 const lazy = (path, method) => (req, res, next) => {
@@ -103,7 +106,6 @@ router.get("/communities-by-id/:communityId", lazy(COMM, "getCommunityById"));
 router.put(
   "/communities-by-id/:communityId",
   verifyToken,
-  upload.single("avatar"),
   lazy(COMM, "updateCommunity"),
 );
 router.delete(
@@ -123,42 +125,50 @@ router.post(
 router.get(
   "/communities-by-id/:communityId/members",
   verifyToken,
+  checkCommunityPermission(),
   lazy(COMM, "getMembers"),
 );
 router.post(
   "/communities-by-id/:communityId/members/:userId/permissions",
   verifyToken,
+  checkCommunityPermission("can_manage_mods"),
   lazy(COMM, "updateMemberPermissions"),
 );
 router.delete(
   "/communities-by-id/:communityId/members/:userId/permissions",
   verifyToken,
+  checkCommunityPermission("can_manage_mods"),
   lazy(COMM, "updateMemberPermissions"),
 );
 router.post(
   "/communities/:communityId/:action",
   verifyToken,
+  checkCommunityPermission("can_ban_users"),
   lazy(COMM, "handleToggleBan"),
 );
 router.get(
   "/communities-by-id/:communityId/reports",
   verifyToken,
+  checkCommunityPermission(),
   lazy(COMM, "getReports"),
 );
 router.delete(
   "/communities-by-id/:communityId/reports/:reportId",
   verifyToken,
+  checkCommunityPermission("can_delete_posts"),
   lazy(COMM, "resolveReport"),
 );
 
 router.get(
   "/communities/:communityId/members",
   verifyToken,
+  checkCommunityPermission(),
   lazy(COMM, "getMembers"),
 );
 router.post(
   "/communities/:communityId/members/:userId/permissions",
   verifyToken,
+  checkCommunityPermission("can_manage_mods"),
   lazy(COMM, "updateMemberPermissions"),
 );
 
